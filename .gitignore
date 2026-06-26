@@ -1,0 +1,31 @@
+# Game assets (DO NOT COMMIT)
+reverse/extracted/
+tracks/
+*.bin
+*.iso
+*.mdf
+*.mds
+
+# Engine code (keep only docs)
+igi-engine/
+
+# Build artifacts
+target/
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+*.exe
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
