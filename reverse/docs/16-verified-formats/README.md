@@ -916,10 +916,15 @@ each - the audio lives in the paired ILSF `.wav`. Durations 13.4 to 120.9 second
 `pc/menusystem/*.res` and `pc/screens/**/*.res` are ILFF archives whose contents are
 **LOOP textures**; the nested `ILFF` payloads inside them are `.fnt` fonts.
 
-There is **no `.spr` format**. The docs' `COMPUTER:h_camera.spr` and
-`STATUSSCREEN:weapon.spr` paths are resource *names*; the container is ILFF (`.res`)
-and the payload is a LOOP texture, confirmed on 8 sampled `NAME`/`BODY` pairs across 4
-archives. A menu sprite decodes to a coherent PNG with `reverse/tools/loop.py`.
+**`.spr` / `.pic` are extension labels, not formats.** The archives hold **158 `.spr`**
+entries (`computer/computer.res` 49, `screens/game/status/status.res` 47,
+`menusystem/menusystem.res` 24, `common/sprites/sprites.res` 16,
+`menusystem/missionsprites.res` 14, `menusystem/ingamemenu.res` 8) and **5 `.pic`**
+entries (`mainmenu.pic`, `logo.pic`, `logo_us.pic` in `menusystem.res`; `loading.pic`,
+`loading_us.pic` in `loadingscreen.res`). Every one of those payloads starts with
+`LOOP` + version 9 - they are LOOP textures (sprites, HUD elements, the main-menu and
+loading pictures), not a separate binary format. A menu sprite decodes to a coherent
+PNG with `reverse/tools/loop.py`.
 
 ---
 

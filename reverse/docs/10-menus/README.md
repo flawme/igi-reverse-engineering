@@ -10,11 +10,15 @@
 | Fonts | nested ILFF `.fnt` payloads |
 | Strings | `language/<lang>/menusystem.res` (262 strings) |
 
-There is **no `.spr` format**. The `COMPUTER:h_camera.spr` and
-`STATUSSCREEN:weapon.spr` paths in earlier revisions are resource *names*; the
-container is ILFF and the payload is a LOOP texture, confirmed on 8 sampled
-`NAME`/`BODY` pairs across 4 archives. A menu sprite decodes to a coherent PNG with
-`reverse/tools/loop.py`.
+**`.spr` / `.pic` are extension labels, not formats.** The archives hold **158 `.spr`**
+entries (`computer/computer.res` 49, `screens/game/status/status.res` 47,
+`menusystem/menusystem.res` 24, `common/sprites/sprites.res` 16,
+`menusystem/missionsprites.res` 14, `menusystem/ingamemenu.res` 8) and **5 `.pic`**
+entries (`mainmenu.pic`, `logo.pic`, `logo_us.pic` in `menusystem.res`; `loading.pic`,
+`loading_us.pic` in `loadingscreen.res`). Every one of those payloads starts with
+`LOOP` + version 9 - they are LOOP textures (sprites, HUD elements, the main-menu and
+loading pictures), not a separate binary format. A menu sprite decodes to a coherent
+PNG with `reverse/tools/loop.py`.
 
 The menu labels themselves are in the game's string table - dump them with
 `reverse/tools/langdump.py`. The shipped English labels include `Main Menu`,
