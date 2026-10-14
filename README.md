@@ -164,6 +164,16 @@ igi/
     └── extracted/         # (gitignored) game files
 ```
 
+## Related research
+
+- **[heaven-hm/project-igi-research-data](https://github.com/heaven-hm/project-igi-research-data)** -
+  please check it out. Runtime analysis (a Cheat Engine table with live pointer chains,
+  a Ghidra database, the natives list), format documentation for IGI1 and IGI2, 010
+  Editor templates and a tool index, plus a web portal at
+  [project-igi-research.vercel.app](https://project-igi-research.vercel.app/). The
+  cross-check against it added the player difficulty scaling (0.75 / 1.0 / 1.25) and
+  the second gravity handler to this repo.
+
 ## Legal
 
 - **No game assets included**
