@@ -133,6 +133,19 @@ representation of metres with 12 fractional bits. Six independent conversions in
 The game's own script-level units are metres (distances), km/h (velocities) and
 seconds (times); the engine converts them to internal units with the factors above.
 
+**A second gravity path.** The same velocity field (`entity+0x66C`) is also driven by
+a second handler, `fcn.004084b0`, which subtracts `84.741692` (`[0x5333f0]` = 18.62
+m/s^2 at 30 ticks/s) with **no** damping and then adds an air-control acceleration:
+the four input fields at `entity+0x1b8`..`+0x1c4` (compared against 0.0), scaled by
+`[0x56e944]` and rotated by the entity's 3x3 orientation matrix at `+0x78`..`+0x94`,
+added to `+0x664`/`+0x668`/`+0x66c`. It is reached from the player update (`0x410a26`
+-> the dispatch thunk `0x408460`, whose handler table at `0xa97240` is filled at
+runtime) and from three direct call sites (`0x40bc29`, `0x40be97`, `0x40e678`). The
+damped handler above (`0x40dc41`, site `0x40dc74`) has no direct caller in the binary
+- it is reached through a runtime table as well. Both are real; which one runs in
+which player state is not determined statically, and the 9.8 m/s^2 constant remains
+the one that matches the script-level metre.
+
 **Negative result - `MuzzleVelocity` is dead data.** The weapon table's
 `MuzzleVelocity` (`weapon+0x660`) is written by the `DefineWeaponType` handler at
 `0x414290` and never read (a byte search for the offset in every addressing form

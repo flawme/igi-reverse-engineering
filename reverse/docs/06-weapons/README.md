@@ -301,6 +301,33 @@ so AI humans die at total damage 1.0. The player's threshold comes from
 `DefineHumanPlayerGeneral` argument 7, stashed at `[0x56e954]` (`0x410179`) and
 patched into `human+0x258` at `0x410531`.
 
+### Difficulty scaling - player only ✅ VERIFIED
+
+The player's damage path is a second copy of the same formula with one extra factor.
+`fcn.004124b0` (which fetches the active player profile at `0x4124cf`) does:
+
+```
+0x412512  fld dword [ebp + ebx*8 + 0x10]   ; hitzone multiplier
+0x412516  fmul dword [edi + 4]             ; * event->DamageFactor
+0x412519  mov ecx, [eax]                   ; difficulty = active player profile +0x00
+0x412524  je 0x412548                      ; 0 -> * 0.75   [0x53351c]
+0x412527  je 0x412556                      ; 1 -> no multiply (1.0)
+0x41252a  je 0x41253c                      ; 2 -> * 1.25   [0x533520]
+0x41252c  push "Difficulty level not defined %d"   ; 0x5390d4
+0x412563  fadd dword [ebp + ebx*8 + 0x0c]  ; accumulate per hitzone
+```
+
+```
+damage_dealt     = hitzone_multiplier[hitzone] * DamageFactor * difficulty_scale
+difficulty_scale = { 0.75 (easy), 1.0 (normal), 1.25 (hard) }
+```
+
+The scale is the first dword of the active player profile (`0x405b80` returns the
+profile; `mov ecx, [eax]` at `0x412519`). Two more sites carry the same switch
+(`0x412c74`, `0x412e93`), both in functions that fetch the player profile
+(`0x412a1e`, `0x412d6d`). The AI handler `fcn.0045fcd0` has **no** difficulty factor -
+the scaling is player-only.
+
 ### Damage-factor flow ✅ VERIFIED
 
 ```

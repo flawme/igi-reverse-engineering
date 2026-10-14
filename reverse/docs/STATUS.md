@@ -48,7 +48,7 @@ below. Byte-level tables: [16-verified-formats](16-verified-formats/README.md).
 | Level 14 `.ctr` | 44-byte records (`486,464 = 11,056 x 44`) | ✅ | constant 8-byte marker at +0x24, gaps all multiples of 44 |
 | `.cmd` triangle flag bit | high nibble inferred to be a material index (14/15/4); winding/split/order rejected | ⚠️ | `CreateTerrainMaterial` `0x4c64d0` builds a 900-byte-stride table |
 | `cmd_transform[8]` | `0xFF` = unused, `0..7` = transform index; what it selects unknown | ⚠️ | rule holds 149,243/149,256 records (13 exceptions = zero-filled roots) |
-| World scale | **4096 units = 1 m** | ✅ | the `%.2fm` print multiplies by 1/4096 (`0x5334b0`); gravity 44.6009 at `0x53346c` = 9.8 x 4096 / 900 (30 ticks/s) |
+| World scale | **4096 units = 1 m** | ✅ | the `%.2fm` print multiplies by 1/4096 (`0x5334b0`); gravity 44.6009 at `0x53346c` = 9.8 x 4096 / 900 (30 ticks/s). A second handler (`fcn.004084b0`) uses 84.7417 at `0x5333f0` (18.62 m/s^2, undamped) - which state uses which is open |
 
 ## Rendering
 
@@ -71,10 +71,10 @@ below. Byte-level tables: [16-verified-formats](16-verified-formats/README.md).
 
 | Item | Value | Confidence | Method |
 |------|-------|------------|--------|
-| ILFF header | 16 bytes: `"ILFF"`, size, sub-format, 0 | ✅ | 92/92 files |
+| ILFF header | 16 bytes (`"ILFF"`, size, sub-format, 0) + a 4-byte format id at `+0x10` (`"IRES"`/`"HSEM"`); the loader reads the 20 bytes as one struct | ✅ | 92/92 files; loader `fcn.004b5e30` |
 | Chunk header | tag (4 or 8 bytes, 4-aligned) + size + type + total | ✅ | 90,893 chunks |
 | Chunk advance | `align4(offset + id_field + 12 + extra + size)` | ✅ | every parse consumes the declared size |
-| `total` field | `align4(16 + size)` when non-zero, frequently 0; **not** the advance | ✅ | two independent counter-examples |
+| `total` field | the advance for every 4-byte-tag chunk (90,709/90,709, incl. type-32); 0 in 93 chunks (92 last + the zero-size `IRES` marker); 4 short only for the 91 eight-byte-tag first chunks | ✅ | full-tree measurement |
 | Sub-format 32 | nested resource padded to a 32-byte boundary | ✅ | 243/243 chunks of `common.res` |
 | Nested archives | `BODY` payload is a nested ILFF (models) or LOOP (textures) | ✅ | 6,795 models parsed |
 | Compression/checksums | none observed | ✅ | 92 files |
@@ -119,7 +119,7 @@ below. Byte-level tables: [16-verified-formats](16-verified-formats/README.md).
 | Ammo types | 14 directories in `pc/ammo/` | ✅ | filesystem |
 | Parameter schema | 50 named parameters | ✅ | `weaponconfig.qvm` declaration |
 | Parameter values | all 24 weapons, all 50 fields | ✅ | `reverse/data/weapon_table.tsv` |
-| Damage model | `hitzone_multiplier[hitzone] * DamageFactor`, accumulated per hitzone; penetration gates continuation only (damage is applied first) | ✅ | `fcn.0045fcd0` `0x45fd26`-`0x45fd32`; `0x47c195` |
+| Damage model | `hitzone_multiplier[hitzone] * DamageFactor`, accumulated per hitzone; penetration gates continuation only (damage is applied first); the **player** path additionally scales by the profile difficulty (0.75 / 1.0 / 1.25) | ✅ | `fcn.0045fcd0` `0x45fd26`-`0x45fd32`; `0x47c195`; difficulty switch `0x412524`-`0x412552` |
 | Hitzone multipliers | 17 x 16-byte entries; `0.5/0.75/1.0` triples, `100.0` at indices 15/16 (head) | ✅ | AI table `0x53f9d0`, player table `0x538a00` |
 
 ## Task System
@@ -172,9 +172,9 @@ below. Byte-level tables: [16-verified-formats](16-verified-formats/README.md).
 Resolved by the IGI.exe disassembly passes (2026-10-14): the nav `.dat` cell field
 (next-hop node ID), `.mtp` `INST` semantics, ILSF flags/version/trailing byte, QVM
 leftovers (PUSHA/BRK/native call convention), LOOP leftovers (v9 `0x10`, v9 descriptor
-`+0x0E`), the `.fnt` `TRAN` map and `FONTFNTH` fields, the weapon damage formula,
-`.iff` playback (bone objects, per-frame update, SLERP sampler, selection path), and
-world scale (4096 units = 1 m).
+`+0x0E`), the `.fnt` `TRAN` map and `FONTFNTH` fields, the weapon damage formula and
+the player difficulty scaling (0.75 / 1.0 / 1.25), `.iff` playback (bone objects,
+per-frame update, SLERP sampler, selection path), and world scale (4096 units = 1 m).
 
 ### High Priority
 1. `OCEMHSEM` / `DNER` leftover fields - `+0x7C` (XTVM count) and `+0x7E` (ATTA count)
@@ -189,13 +189,17 @@ world scale (4096 units = 1 m).
 4. `TAMC` / `PMTL` semantics (record shapes decoded; HPSC is consumed as 24-byte
    records; no TAMC consumer and no flag-3 `D3DR+0x18` reader located)
 5. `.fnt` glyph record `+0x24` semantic and the remaining `TRAN` bytes
+6. Which gravity handler runs in which player state - two handlers drive the same
+   velocity field (`+0x66C`): the damped one at `0x40dc41` (44.6009 = 9.8 m/s^2) and
+   the undamped air-control one at `fcn.004084b0` (84.7417 = 18.62 m/s^2); both are
+   reached through runtime-filled dispatch tables
 
 ### Low Priority
-6. Animation format - no `.anm` files ship in the retail tree; the `anims/`
+7. Animation format - no `.anm` files ship in the retail tree; the `anims/`
    directories are empty
-7. Network protocol - no evidence found
-8. Save format - no evidence found
-9. Performance metrics - not measured
+8. Network protocol - no evidence found
+9. Save format - no evidence found
+10. Performance metrics - not measured
 
 ## Methodology Notes
 
@@ -218,10 +222,13 @@ world scale (4096 units = 1 m).
 ## Last Updated
 
 - Date: 2026-10-14
-- Version: 7.2
+- Version: 7.3
 - Status: container, terrain, model, texture, bytecode, audio, font, navigation,
   manifest and animation formats verified against the retail data, every format anchored
   to its loader in `IGI.exe`, the weapon damage formula recovered, and the world scale
   proven (4096 units = 1 m). Remaining open items are listed above.
 - 7.2: reconciled stale rows with the disassembly pass (weapon damage and hitzones,
   ILSF flags/version, navigation nodes, `PUSH*I*`, `DNER`/`OCEMHSEM` leftovers).
+- 7.3: cross-check against the `project-igi-research-data` claims - added the player
+  difficulty scaling, corrected the ILFF header/`total`-field description, documented
+  the second gravity handler.

@@ -34,7 +34,8 @@ rival interpretation against each claim. Results:
 
 | Claim | Rival | Outcome |
 |-------|-------|---------|
-| ILFF advance = `align4(offset + id_field + 12 + extra + size)` | advance = `total` when non-zero | claim 92/92, rival **0/92** |
+| ILFF advance = `align4(offset + id_field + 12 + extra + size)` | advance = `total` when non-zero (same framing) | claim 92/92, rival **0/92** |
+| ILFF advance (as above) | loader framing: 20-byte header, 4-byte tags from `0x14`, advance = `total` | claim 92/92, rival **91/92** (fails only on `common.res` - its zero-size `IRES` marker puts the next chunk at `0x20`) |
 | `.bit`/`.hmp` descriptor table has 256 slots | 128 or 512 slots | 256 fits 14/14 and 6/6; 128 and 512 fit **0** |
 | `.lmp` images are `size x size` | a `(width, height)` pair | the square walk consumes every file exactly; the pair reading produces absurd sizes |
 | `.cmd` is addressed by `.ctr` offsets | `.cmd` is a linear 8-byte array | addressed 11,022/11,022 valid; linear **2,551/63,587** |
@@ -92,14 +93,24 @@ searches for the magic therefore find nothing - this is why the earlier pass rec
 
 Used by every resource archive: textures, models, lightmaps, sprites, sounds, menus.
 
-### File header (16 bytes)
+### File header (16 bytes + a 4-byte format id)
 
 | Offset | Size | Type | Meaning | Evidence |
 |--------|------|------|---------|----------|
-| 0x00 | 4 | char[4] | `"ILFF"` | all 92 files |
+| 0x00 | 4 | char[4] | `"ILFF"` | all 92 files; loader `cmp eax, 0x46464c49` at `0x4b5e52` |
 | 0x04 | 4 | uint32 | total file size | equals the on-disk size in all 92 files |
 | 0x08 | 4 | uint32 | sub-format id: `4` for most resources, `32` for `common/textures/common.res` | 91 files are 4, 1 file is 32 |
 | 0x0C | 4 | uint32 | always 0 | all 92 files |
+| 0x10 | 4 | char[4] | format id: `"IRES"` for resource archives, `"HSEM"` for models | loader `cmp eax, 0x53455249` at `0x4b5e62` |
+
+The loader reads the first 20 bytes as one header struct (`fcn.004b5e30` requires
+`[node+0] == "ILFF"` and `[node+0x10] == "IRES"`), and its chunk parser
+(`fcn.004b5fa0`) starts at `+0x14` with a 4-byte tag - the first comparison is
+`cmp eax, 0x454d414e` (`"NAME"`). The parser in `reverse/tools/igi_formats.py` reads
+the same bytes as a 16-byte header plus an 8-byte first tag (`IRESNAME`); the two
+framings produce identical chunk offsets on 91 of the 92 files. `common.res` is the
+discriminator: its `IRES` marker is a zero-size chunk at `0x10`, so the next chunk
+sits at `0x20`, not `0x14` - only the 8-byte-tag reading consumes it.
 
 ### Chunk
 
@@ -107,22 +118,25 @@ Chunks follow the header and repeat until EOF.
 
 | Offset | Size | Type | Meaning |
 |--------|------|------|---------|
-| 0x00 | 4 or 8 | char[] | ASCII tag, null-padded to a 4-byte boundary |
+| 0x00 | 4 or 8 | char[] | ASCII tag, null-padded to a 4-byte boundary (the loader reads 4-byte tags) |
 | +0 | 4 | uint32 | payload byte count |
 | +4 | 4 | uint32 | type: mirrors the file sub-format (`4`, or `32` for texture resources) |
-| +8 | 4 | uint32 | `align4(16 + size)` when non-zero; **frequently 0** |
+| +8 | 4 | uint32 | `total`: byte distance to the next chunk |
 | +12 | `size` | uint8[] | payload |
 | | 0-3 | | pad to a 4-byte boundary |
 
 The next chunk starts at `align4(offset + id_field + 12 + extra + size)` where
 `id_field` is 4 or 8 and `extra` is 28 for type-32 chunks.
 
-**The `total` field is not the advance.** It is `align4(16 + size)` when populated and
-0 otherwise, and it does not account for the extra 4 bytes of an 8-byte tag. Two
-independent proofs: `NAME` at 0x14 of `common/sounds/sounds.res` has `size=36`,
-`total=52`, but the following `BODY` sits at 0x48 (= 0x14 + align4(8+12+36)); and
-`BODY` at 0x54 of `common/textures/common.res` has `size=32800`, `total=32844`, and the
-following `NAME` sits at 0x80A0 (= 0x54 + 32844).
+**The `total` field.** It equals the advance for every 4-byte-tag chunk -
+`next == offset + total` in **90,709/90,709** such chunks, including all 242 type-32
+chunks. It is 0 in 93 chunks: the 92 last chunks of the files plus the zero-size
+`IRES` marker of `common/textures/common.res`. The only disagreement is the 91 first
+chunks: read as an 8-byte tag (`IRESNAME`) the real advance is `align4(20 + size)`
+while `total` is `align4(16 + size)`, 4 short; read the way the loader does - format
+id in the header, a 4-byte `NAME` tag at `0x14` - `total` is exact
+(`common/sounds/sounds.res`: `NAME` at `0x14`, `size=36`, `total=52`, `BODY` at
+`0x48 = 0x14 + 52`).
 
 ### Observed tags
 

@@ -30,9 +30,11 @@ def res_files():
 
 def check_ilff_advance():
     """CLAIM: advance = align4(offset + id_field + 12 + extra + size).
-    RIVAL:   advance = total when total != 0, else align4(16 + size)."""
+    RIVAL A: advance = total when total != 0, else align4(16 + size)  [same framing]
+    RIVAL B: the loader's framing (fcn.004b5e30 + fcn.004b5fa0) - 20-byte header,
+             4-byte tags from 0x14, advance = total when non-zero."""
     print("== ILFF chunk advance")
-    mine_ok = rival_ok = 0
+    mine_ok = rival_ok = loader_ok = 0
     total = 0
     for path in res_files():
         d = open(path, "rb").read()
@@ -40,9 +42,9 @@ def check_ilff_advance():
         info, errors = F.parse_ilff(d)
         if info and not errors and info["end"] == info["file_size"]:
             mine_ok += 1
-        # rival: walk with the total field
-        off, ok = 16, True
         end = min(len(d), F.u32(d, 4))
+        # rival A: our framing, advance by the total field
+        off, ok = 16, True
         while off + 16 <= end:
             c = F._try_chunk(d, off, end)
             if c is None:
@@ -55,9 +57,24 @@ def check_ilff_advance():
                 off = F.align4(off + idf + 12 + size)
         if ok and off == end:
             rival_ok += 1
+        # rival B: the loader's framing - header 20 bytes, 4-byte tags from 0x14
+        off, ok = 20, True
+        while off + 16 <= end:
+            if not F.is_ascii_tag(d[off:off + 4]):
+                ok = False
+                break
+            size = F.u32(d, off + 4)
+            tot = F.u32(d, off + 12)
+            if tot:
+                off += tot
+            else:
+                off = off + 16 + size
+        if ok and off == end:
+            loader_ok += 1
     print(f"   claim rule: {mine_ok}/{total} files consume the declared size")
-    print(f"   rival rule: {rival_ok}/{total} files consume the declared size")
-    print(f"   -> {'claim survives, rival fails' if mine_ok > rival_ok else 'RIVAL ALSO SURVIVES - claim not proven'}")
+    print(f"   rival A (same framing, advance = total): {rival_ok}/{total}")
+    print(f"   rival B (loader framing, 4-byte tags from 0x14, advance = total): {loader_ok}/{total}")
+    print(f"   -> {'claim survives, rivals fail' if mine_ok > max(rival_ok, loader_ok) else 'RIVAL ALSO SURVIVES - claim not proven'}")
 
 
 def check_mef_stride():
