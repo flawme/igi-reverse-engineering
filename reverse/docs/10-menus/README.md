@@ -1,5 +1,112 @@
 # 10 - Menu System
 
+## Menu Resources ✅ VERIFIED
+
+`pc/menusystem/*.res` and `pc/screens/**/*.res` are ILFF archives. Their contents are:
+
+| Content | Container |
+|---------|-----------|
+| Sprites (cursors, buttons, HUD) | **LOOP textures** inside the `.res` |
+| Fonts | nested ILFF `.fnt` payloads |
+| Strings | `language/<lang>/menusystem.res` (262 strings) |
+
+There is **no `.spr` format**. The `COMPUTER:h_camera.spr` and
+`STATUSSCREEN:weapon.spr` paths in earlier revisions are resource *names*; the
+container is ILFF and the payload is a LOOP texture, confirmed on 8 sampled
+`NAME`/`BODY` pairs across 4 archives. A menu sprite decodes to a coherent PNG with
+`reverse/tools/loop.py`.
+
+The menu labels themselves are in the game's string table - dump them with
+`reverse/tools/langdump.py`. The shipped English labels include `Main Menu`,
+`Play Project IGI`, `Multi Player`, `Configuration`, `Quit`, `Update IGI`,
+`Visit Website`, `Read Me`, `Credits`, `Start New Game`, `Load Game`,
+`Select Mission`, `Sound Configuration`, `FX Volume`, `Music Volume`,
+`Graphics Configuration`, `Resolution`, `Render Device`, `Gamma`,
+`Advanced Options`, `Graphics Detail`.
+
+## .fnt loader evidence (IGI.exe)
+
+The `.fnt` payloads are loaded by `fcn.004b65d0` (`0x4b65d0`): `cmp eax,0x46464C49`
+(ILFF) at `0x4B65FC`, `cmp eax,0x544E4F46` (FONT) at `0x4B6610`; chunk lookups
+`push 0x48544E46` (FNTH) at `0x4B663A`, `push 0x4E415254` (TRAN) at `0x4B6645`,
+`push 0x464D4E41` (ANMF) at `0x4B6652`. Both shipped fonts are ILFF containers with the
+same chunk order
+(`FONTFNTH`, `ANMF`, `TRAN`, `TEXH`, `BODY`):
+
+| File | FONTFNTH | ANMF | TRAN | TEXH | BODY |
+|---|---|---|---|---|---|
+| `screens/intro/font3.fnt` | 24 B | 6160 B = 154x40 | 512 B | 24 B | 131072 B = 256x128x4 |
+| `screens/intro/font4.fnt` | 24 B | 6160 B = 154x40 | 512 B | 24 B | 65536 B = 128x128x4 |
+
+### TRAN - the character-to-glyph map ✅ VERIFIED
+
+`TRAN` is a **256-entry `uint16` array indexed by Latin-1 character code**, holding the
+glyph index. The loader allocates 256 bytes (`push 0x100` at `0x4B6740`,
+`call 0x4B74F0` at `0x4B6745`), stores the pointer at `font+0x0C`
+(`mov [edi+0xc],eax` at `0x4B674D`) and fills it entry by entry:
+
+```
+0x4B6752 mov al, byte [ebx]      ; low byte of TRAN[i]
+0x4B6754 mov ecx, [edi+0xc]      ; the table
+0x4B675C call 0x4B75B0           ; table[i] = value
+0x4B6764 inc esi
+0x4B6765 add ebx, 2              ; 2 bytes per entry
+0x4B6768 cmp esi, 0x100
+```
+
+Data verification (both fonts, byte-identical tables): 154 non-zero entries, values
+exactly the set {1..154} - a permutation, so every glyph 1..154 is reachable and glyph
+0 is unused. `0x41`-`0x5A` (`A`..`Z`) map to 30..55, `0x61`-`0x7A` (`a`..`z`) to 62..87;
+the Latin-1 tail (`0xA0`-`0xFF`) is identical in both fonts (e.g. `0xF7` -> 154, the
+sentinel entry). Characters absent from the table (space, `!`-`$`, `0x83`-`0xA0`) have
+no glyph and must be handled by the renderer.
+
+### FONTFNTH ✅ VERIFIED
+
+`FONTFNTH` is 24 bytes = 6 dwords:
+
+| Field | font3 | font4 | Meaning | Evidence |
+|---|---|---|---|---|
+| 0 | 1 | 1 | font init arg8: `0x10000` if 0, else 0 | `0x4B66E7` neg/sbb, pushed at `0x4B66FB` |
+| 1 | 154 | 154 | **glyph count** | `mov edx,[edi+4]` `0x4B66DE` -> font init arg10 -> `font+0x14` (`0x4B64B6`) |
+| 2 | 32 | 32 | **no reader** | - |
+| 3 | 6 | 4 | sentinel glyph `+0x10` | `0x4B6543` |
+| 4 | 24 | 24 | sentinel glyph `+0x0C` | `0x4B6527` |
+| 5 | 21 | 15 | **max glyph height + 1** (font3 20 -> 21, font4 14 -> 15); sentinel glyph `+0x0E` | `0x4B6534` |
+
+Fields 3/4/5 are stored into the **sentinel glyph at index 154** (the font init writes
+it at `0x4B6527`/`0x4B6534`/`0x4B6543`), i.e. a virtual glyph carrying the font-wide
+metrics. Field 2 (32) has no reader at all.
+
+### The glyph record (40 bytes) ✅ VERIFIED
+
+`ANMF` is `glyph_count` records of 40 bytes. Layout (verified against both files):
+
+| Offset | Type | Meaning | Evidence |
+|---|---|---|---|
+| +0x04 | float | u0 | `mov edx,[esi-8]` `0x4B6784` |
+| +0x08 | float | v0 | `mov ecx,[esi-4]` `0x4B6780` |
+| +0x0C | float | u1 | `mov eax,[esi]` `0x4B677E` |
+| +0x10 | float | v1 | `mov edx,[esi+4]` `0x4B677B` |
+| +0x16 | word | width | `movsx edx, word [esi+0xa]` `0x4B67A0` |
+| +0x18 | word | height | `movsx ecx, word [esi+0xc]` `0x4B679C` |
+| +0x1A | word | advance | `movsx ecx, word [esi+0xe]` `0x4B678C` |
+| +0x24 | word | per-glyph vertical metric (see below) | `movsx edx, word [esi+0x18]` `0x4B6792` |
+
+Data verification (both fonts, 154/154 glyphs): `(u1-u0)*atlas_width == width` and
+`(v1-v0)*atlas_height == height` - 0 failures; every rect contains ink (coverage is the
+4th byte of each 32bpp pixel).
+
+⚠️ **`+0x24` is not settled.** It is a per-glyph 16-bit value (0..16) that the loader
+copies into the internal 36-byte glyph at `+0x10` (`mov word [edx+eax+0x10], si` at
+`0x4B643F`) - the same slot the sentinel uses for `FONTFNTH+0x0C`. Data-consistent
+reading: `height + value` is 17 for most glyphs (font3: `A` 15+2, `y` 11+6) and 21 for
+the tallest ones (`(` 20+1), i.e. it behaves like a vertical metric that, added to the
+glyph height, lands on the font's line box (21 = `FONTFNTH+0x14`). It is not the ink
+offset inside the glyph rect (`.` has h=6 with its ink in the bottom 2 rows and
+`+0x24` = 14). The renderer that consumes the internal glyph record was not located,
+so the exact semantic is open.
+
 ## Menu Hierarchy (Reconstructed)
 
 **Confidence:** MEDIUM - Reconstructed from menu QVM files and UI observation. May be incomplete.

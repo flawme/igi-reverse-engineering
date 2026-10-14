@@ -8,85 +8,49 @@ Everything in the engine is a "Task". Tasks have types, events, and parameters. 
 
 ## Task Types (64 total)
 
-**Confidence:** MEDIUM - Type names extracted from string analysis. Descriptions are guesses based on names.
+**Confidence:** HIGH for the names and the count - extracted verbatim from `IGI.exe`
+(`strings -n 6 IGI.exe | grep '^TASKTYPE_'` returns 64 real names plus one regex
+pattern). The descriptions below are descriptive, not from the data.
 
-### Vehicle Tasks (15)
+The complete list, in the order the strings appear:
 
-| Task Type | Description | Confidence | Method |
-|-----------|-------------|------------|--------|
-| TASKTYPE_CAR | Car vehicle | MEDIUM | String analysis |
-| TASKTYPE_WHEEL | Vehicle wheel | MEDIUM | String analysis |
-| TASKTYPE_HELI | Helicopter | MEDIUM | String analysis |
-| TASKTYPE_PLANE | Aircraft | MEDIUM | String analysis |
-| TASKTYPE_GEAR | Landing gear | MEDIUM | String analysis |
-| TASKTYPE_HATCH | Vehicle hatch | MEDIUM | String analysis |
-| TASKTYPE_RUDDER | Flight control | MEDIUM | String analysis |
-| TASKTYPE_AFTERBURNER | Jet engine | MEDIUM | String analysis |
-| TASKTYPE_ROTOR | Helicopter rotor | MEDIUM | String analysis |
-| TASKTYPE_COCKPITSHIELD | Cockpit glass | MEDIUM | String analysis |
-| TASKTYPE_CARDOOR | Car door | MEDIUM | String analysis |
-| TASKTYPE_HELIWHEEL | Helicopter wheel | MEDIUM | String analysis |
-| TASKTYPE_HELIDOOR | Helicopter door | MEDIUM | String analysis |
-| TASKTYPE_ROCKETPOD | Rocket launcher | MEDIUM | String analysis |
-| TASKTYPE_RADARDISH | Radar dish | MEDIUM | String analysis |
+```
+AFTERBURNER            AISTATIONARYGUN        ALARMLIGHT
+ALARMLIGHTREFLECTOR    ANIMSOUND              BINOCULAR
+BONEMAGICOBJ           BUILDING               CABARREL
+CACLIP                 CAR                    CARDOOR
+COCKPITSHIELD          CUTSCENE               DEATHZONE
+DRAWER                 EDITCAMERA             EDITORMAGICOBJ
+EDITRIGIDOBJ           EXPLODEMAGICOBJ        FENCE
+GEAR                   GENERICPHYSICSMAGICOBJ GENERICPHYSICSOBJ
+GLASS                  GRENADE                GUN
+GUNCLIP                GUNDRAGUNOV            GUNFLAME
+GUNM16A2               GUNMOVINGPART          GUNMP5SD
+GUNSHOT                GUNSHOTEFFECT          GUNSPAS12
+GUNX2                  HATCH                  HELI
+HELIDOOR               HELIWHEEL              HITZONE
+KNIFESTAB              LADDER                 LEVELFLOW
+LEVELTIMER             M203                   MAGICOBJ
+MEDIPACK               MINE                   MISSILE
+MOVERIGIDOBJ           NOISEQTASK             PHYSICSMAGICOBJ
+PLANE                  PROXIMITYMINE          RADARDISH
+ROCKETPOD              ROTOR                  RUDDER
+SCAMERALENSVIEWCONE    SMOKE                  SMOOTHQTASK
+WHEEL
+```
 
-### Weapon/Effect Tasks (15)
+Earlier revisions of this document split these into guessed "Vehicle / Weapon /
+Interactive / System" groups of 15/15/13/15 - that split was invented and only covered
+58 of the 64. The names above are the verified complete set.
 
-| Task Type | Description | Confidence | Method |
-|-----------|-------------|------------|--------|
-| TASKTYPE_GUN | Weapon system | MEDIUM | String analysis |
-| TASKTYPE_GUNSHOT | Bullet projectile | MEDIUM | String analysis |
-| TASKTYPE_GUNFLAME | Muzzle flash | MEDIUM | String analysis |
-| TASKTYPE_GUNMOVINGPART | Animated weapon parts | MEDIUM | String analysis |
-| TASKTYPE_GUNCLIP | Magazine/clip | MEDIUM | String analysis |
-| TASKTYPE_GUNX2 | Dual weapons | MEDIUM | String analysis |
-| TASKTYPE_GRENADE | Grenade projectile | MEDIUM | String analysis |
-| TASKTYPE_MINE | Mine device | MEDIUM | String analysis |
-| TASKTYPE_PROXIMITYMINE | Proximity-triggered mine | MEDIUM | String analysis |
-| TASKTYPE_MISSILE | Guided missile | MEDIUM | String analysis |
-| TASKTYPE_M203 | Grenade launcher | MEDIUM | String analysis |
-| TASKTYPE_SMOKE | Smoke effect | MEDIUM | String analysis |
-| TASKTYPE_GUNSHOTEFFECT | Shot visual effect | MEDIUM | String analysis |
-| TASKTYPE_KNIFESTAB | Knife attack | MEDIUM | String analysis |
-| TASKTYPE_AISTATIONARYGUN | AI-controlled turret | MEDIUM | String analysis |
+### Notable groups (descriptive, not from the data)
 
-### Interactive Tasks (13)
-
-| Task Type | Description | Confidence | Method |
-|-----------|-------------|------------|--------|
-| TASKTYPE_FENCE | Fence object | MEDIUM | String analysis |
-| TASKTYPE_LADDER | Climbable ladder | MEDIUM | String analysis |
-| TASKTYPE_DRAWER | Openable drawer | MEDIUM | String analysis |
-| TASKTYPE_BUILDING | Building structure | MEDIUM | String analysis |
-| TASKTYPE_GLASS | Breakable glass | MEDIUM | String analysis |
-| TASKTYPE_DEATHZONE | Kill trigger | MEDIUM | String analysis |
-| TASKTYPE_MEDIPACK | Health pickup | MEDIUM | String analysis |
-| TASKTYPE_BINOCULAR | Binoculars item | MEDIUM | String analysis |
-| TASKTYPE_CABARREL | Explosive barrel | MEDIUM | String analysis |
-| TASKTYPE_CACLIP | Ammo clip pickup | MEDIUM | String analysis |
-| TASKTYPE_ALARMLIGHT | Alarm light | MEDIUM | String analysis |
-| TASKTYPE_ALARMLIGHTREFLECTOR | Alarm light reflector | MEDIUM | String analysis |
-| TASKTYPE_SCAMERALENSVIEWCONE | Security camera | MEDIUM | String analysis |
-
-### System Tasks (15)
-
-| Task Type | Description | Confidence | Method |
-|-----------|-------------|------------|--------|
-| TASKTYPE_LEVELFLOW | Level flow control | MEDIUM | String analysis |
-| TASKTYPE_LEVELTIMER | Level timer | MEDIUM | String analysis |
-| TASKTYPE_CUTSCENE | Cutscene playback | MEDIUM | String analysis |
-| TASKTYPE_MAGICOBJ | Magic/interactive object | MEDIUM | String analysis |
-| TASKTYPE_GENERICPHYSICSOBJ | Generic physics object | MEDIUM | String analysis |
-| TASKTYPE_GENERICPHYSICSMAGICOBJ | Physics magic object | MEDIUM | String analysis |
-| TASKTYPE_EDITRIGIDOBJ | Editor rigid object | MEDIUM | String analysis |
-| TASKTYPE_EDITCAMERA | Editor camera | MEDIUM | String analysis |
-| TASKTYPE_EDITORMAGICOBJ | Editor magic object | MEDIUM | String analysis |
-| TASKTYPE_MOVERIGIDOBJ | Move rigid object | MEDIUM | String analysis |
-| TASKTYPE_ANIMSOUND | Animation sound | MEDIUM | String analysis |
-| TASKTYPE_BONEMAGICOBJ | Bone magic object | MEDIUM | String analysis |
-| TASKTYPE_NOISEQTASK | Noise qtask | MEDIUM | String analysis |
-| TASKTYPE_SMOOTHQTASK | Smooth qtask | MEDIUM | String analysis |
-| TASKTYPE_HITZONE | Hit detection zone | MEDIUM | String analysis |
+| Group | Names |
+|-------|-------|
+| Vehicles | `CAR`, `CARDOOR`, `WHEEL`, `HELI`, `HELIDOOR`, `HELIWHEEL`, `ROTOR`, `PLANE`, `GEAR`, `RUDDER`, `AFTERBURNER`, `HATCH`, `COCKPITSHIELD`, `ROCKETPOD`, `MISSILE` |
+| Weapons and effects | `GUN`, `GUNCLIP`, `GUNDRAGUNOV`, `GUNFLAME`, `GUNM16A2`, `GUNMOVINGPART`, `GUNMP5SD`, `GUNSHOT`, `GUNSHOTEFFECT`, `GUNSPAS12`, `GUNX2`, `GRENADE`, `MINE`, `PROXIMITYMINE`, `M203`, `KNIFESTAB`, `AISTATIONARYGUN`, `SMOKE` |
+| Interactive props | `FENCE`, `LADDER`, `DRAWER`, `GLASS`, `CABARREL`, `CACLIP`, `MEDIPACK`, `BINOCULAR`, `ALARMLIGHT`, `ALARMLIGHTREFLECTOR`, `SCAMERALENSVIEWCONE`, `RADARDISH`, `BUILDING`, `DEATHZONE`, `HITZONE` |
+| System / editor | `LEVELFLOW`, `LEVELTIMER`, `CUTSCENE`, `MAGICOBJ`, `BONEMAGICOBJ`, `EXPLODEMAGICOBJ`, `PHYSICSMAGICOBJ`, `GENERICPHYSICSOBJ`, `GENERICPHYSICSMAGICOBJ`, `MOVERIGIDOBJ`, `EDITRIGIDOBJ`, `EDITCAMERA`, `EDITORMAGICOBJ`, `ANIMSOUND`, `NOISEQTASK`, `SMOOTHQTASK` |
 
 ## Task Architecture (Reconstructed)
 
@@ -159,23 +123,20 @@ Interactive objects defined in magicobj.qvm:
 
 **Confidence:** MEDIUM - From QVM script analysis.
 
-## Hit Detection (Guessed)
+## Hit Detection ✅ VERIFIED
 
-**Warning:** These damage multipliers are standard FPS conventions, not verified from the game.
-
-| Zone | Multiplier | Confidence | Method |
-|------|------------|------------|--------|
-| Head | 2x | LOW | Standard FPS convention |
-| Body | 1x | LOW | Standard FPS convention |
-| Limb | 0.5x | LOW | Standard FPS convention |
+The hitzone tables live in `IGI.exe`: 17 x 16-byte entries, first dword = damage
+multiplier. Multipliers are `0.5/0.75/1.0` triples, then `1.0` x3, then `100.0` at
+indices 15/16 (head). AI table `0x53f9d0`, player table `0x538a00`. The damage formula
+is `hitzone_multiplier[hitzone] * DamageFactor` (see
+[06-weapons](../06-weapons/README.md)).
 
 ## Known Issues
 
 1. **Task descriptions inferred** - Based on type names, not verified behavior
 2. **Task architecture reconstructed** - Not extracted from source
 3. **Vehicle hierarchy assumed** - From type names, not confirmed
-4. **Hit detection unverified** - Multipliers are guesses
-5. **Task count unverified** - 64 is from string analysis, may be incomplete
+4. **Task count unverified** - 64 is from string analysis, may be incomplete
 
 ## References
 

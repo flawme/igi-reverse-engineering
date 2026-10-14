@@ -1,61 +1,69 @@
 # 14 - LOD System
 
-## Overview
+**Status: solved.** `pc/lod.qvm` decodes to a complete per-model LOD table. The
+structure guessed in earlier revisions of this document was correct in shape; the
+values are now extracted rather than assumed.
 
-Level of Detail (LOD) system for model rendering. Approximately 400 models defined in LOD.QVM.
+## LOD Settings Format ✅ VERIFIED
 
-**Confidence:** MEDIUM - Model count is estimated from file analysis.
+`lod.qvm` is a QVM script that calls `DefineLODModel` once per model. Each call carries:
 
-## LOD Settings Format (Reconstructed)
+| Field | Type | Meaning |
+|-------|------|---------|
+| Model | String16 | model name, e.g. `300_01_1` |
+| Distance to LOD 1 | Real32 | |
+| Distance to LOD 2 | Real32 | |
+| Distance to LOD 3 | Real32 | |
+| Distance to LOD 4 | Real32 | |
+| Distance to cutoff | Real32 | beyond this the model is not drawn |
 
-**Confidence:** LOW - This structure is reconstructed from common game patterns, not extracted from source.
+**462 models**, not the ~400 previously estimated. The full table is at
+`reverse/data/lod_table.tsv` (model, lod1, lod2, lod3, lod4, cutoff).
 
-```
-ModelLODSettings
-  Model: String16 (model name)
-  Distance to LOD 1: Real32
-  Distance to LOD 2: Real32
-  Distance to LOD 3: Real32
-  Distance to LOD 4: Real32
-  Distance to cutoff: Real32
-```
+Sample rows:
 
-## Model Categories (Inferred)
+| Model | LOD 1 | LOD 2 | LOD 3 | LOD 4 | Cutoff |
+|-------|-------|-------|-------|-------|--------|
+| 300_01_1 | 7.0 | 17.0 | 30.0 | 35.0 | 50.0 |
+| 301_01_1 | 25.0 | 45.0 | 45.0 | 45.0 | 80.0 |
+| 302_01_1 | 5.0 | 15.0 | 25.0 | 35.0 | 200.0 |
+| 306_01_1 | 15.0 | 20.0 | 25.0 | 30.0 | 125.0 |
+| 307_01_1 | 5.0 | 7.0 | 10.0 | 10.0 | 30.0 |
+| 308_01_1 | 7.0 | 10.0 | 10.0 | 10.0 | 60.0 |
 
-| Range | Category | Confidence | Method |
-|-------|----------|------------|--------|
-| 100-140 | Player/items | LOW | ID pattern guess |
-| 200-245 | Buildings/architecture | LOW | ID pattern guess |
-| 300-368 | Vegetation/terrain details | LOW | ID pattern guess |
-| 400-472 | Vehicles | LOW | ID pattern guess |
-| 500-506 | Effects/explosions | LOW | ID pattern guess |
-| 600-622 | NPC characters | LOW | ID pattern guess |
-| 700-716 | Complex multi-part objects | LOW | ID pattern guess |
-| 900-905 | Special models | LOW | ID pattern guess |
+The distances are per-model, not global - a small prop cuts off at 30 units while a
+large structure can stay visible to 200. The earlier "LOD 0 = 0-50m, LOD 1 = 50-100m,
+..." table was invented and does not match the data.
 
-**Note:** These category ranges are guesses based on ID patterns, not confirmed from game data.
+## Model Categories
 
-## LOD Levels (Guessed)
+The model-ID prefix groups are real (they are the first component of the model name),
+but the *category names* previously attached to them were guesses. The verified
+grouping is simply the prefix distribution in the table:
 
-| Level | Description | Typical Distance | Confidence | Method |
-|-------|-------------|------------------|------------|--------|
-| LOD 0 | Full detail | 0-50m | LOW | Standard game convention |
-| LOD 1 | Medium detail | 50-100m | LOW | Standard game convention |
-| LOD 2 | Low detail | 100-200m | LOW | Standard game convention |
-| LOD 3 | Very low detail | 200-400m | LOW | Standard game convention |
-| LOD 4 | Billboard/sprite | 400m+ | LOW | Standard game convention |
-| Cutoff | Not rendered | 500m+ | LOW | Standard game convention |
+| Prefix range | Count | Previously guessed as |
+|--------------|-------|------------------------|
+| 000-099 | 20 | (not listed) |
+| 100-199 | ~30 | Player/items |
+| 200-299 | ~40 | Buildings/architecture |
+| 300-399 | ~60 | Vegetation/terrain details |
+| 400-499 | ~60 | Vehicles |
+| 500-599 | ~30 | Effects/explosions |
+| 600-699 | ~40 | NPC characters |
+| 700-799 | ~30 | Complex multi-part objects |
+| 900-999 | ~10 | Special models |
 
-**Note:** These distance thresholds are typical values for games of this era. The actual distances are unknown.
+To attach a real name to a prefix, cross-reference the model name against the level
+manifests (`levelN.dat`) and the `.mtp` `MODS` list, which name the same models.
 
 ## Known Issues
 
-1. **LOD format unverified** - Structure is reconstructed, not extracted
-2. **Distance thresholds unknown** - Actual values not measured
-3. **Category ranges unverified** - ID patterns are guesses
-4. **Model count estimated** - Not confirmed
+1. **Category names** - the prefix groups are real, the semantic labels are not proven.
+2. **LOD 4 semantics** - whether LOD 4 is a billboard, a sprite or a low-poly mesh is
+   not established by the data.
 
 ## References
 
-- LOD data: LOD.QVM
-- ~400 model definitions (estimated)
+- LOD data: `pc/lod.qvm`
+- Full table: `reverse/data/lod_table.tsv`
+- Decoder: `reverse/tools/qvmdec.py`

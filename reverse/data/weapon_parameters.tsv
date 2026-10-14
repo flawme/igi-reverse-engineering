@@ -1,0 +1,51 @@
+index	parameter	type
+0	Weapon ID	Int32
+1	Script ID	String256
+2	Name	String256
+3	Manufacturer	String256
+4	Description	String256
+5	Weapon Type	EnumInt32
+6	Sight Display Type	EnumInt32
+7	Ammo Display Type	EnumInt32
+8	Mass of Weapon (grams)	Int32
+9	Calibre ID	Int32
+10	Damage Factor	Real32
+11	Penetration Power	Real32
+12	Reload Time	Real32
+13	Muzzle Velocity	Real32
+14	Bullets/Round	Int32
+15	Rounds/Minute	Int32
+16	Rounds/Clip	Int32
+17	Maximum Rounds/Burst	Int32
+18	Minimum random spread	Real32
+19	Maximum random spread	Real32
+20	Fixed view change around X axis (degrees)	Real32
+21	Fixed view change around Z axis (degrees)	Real32
+22	Random view change around X axis (degrees)	Real32
+23	Random view change around Z axis (degrees)	Real32
+24	Type of weapon	String256
+25	Effective Range of Weapon	Real32
+26	Weapon Users	String256
+27	Weapon Length	Int32
+28	Barrel Length	Int32
+29	Gun Model	String16
+30	Casing Model	String16
+31	StandAnim	Int32
+32	MoveAnim	Int32
+33	FireAnim1	Int32
+34	FireAnim2	Int32
+35	FireAnim3	Int32
+36	ReloadAnim	Int32
+37	UpperBodyStandAnim	Int32
+38	UpperBodyWalkAnim	Int32
+39	UpperBodyCrouchAnim	Int32
+40	UpperBodyCrouchRunAnim	Int32
+41	UpperBodyRunAnim	Int32
+42	UpperBodyFireAnim	Int32
+43	UpperBodyReloadAnim	Int32
+44	Fire Sound Loop/Single Sample	String16
+45	Fire Sound Loop End Sample	String16
+46	AI Detection Event Range	EnumReal32
+47	Projectile Task Type	EnumInt32
+48	Weapon Task Type	EnumInt32
+49	Is weapon selectable when empty	bool8

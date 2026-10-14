@@ -4,7 +4,7 @@
 
 | Marker | Meaning |
 |--------|---------|
-| ✅ | Confirmed via hex dump or parser testing |
+| ✅ | Confirmed by parsing the retail game data (parser run or hex dump) |
 | ⚠️ | Partially known - structure documented but details unclear |
 | ❌ | Unknown or not analyzed |
 
@@ -27,37 +27,44 @@ reverse/docs/
 ├── 13-implementation/    # Implementation notes
 ├── 14-lod-system/        # LOD distances
 ├── 15-configuration/     # Config options
+├── 16-verified-formats/  # Byte-level verified specs + evidence
 ├── STATUS.md             # What we know vs don't know
 └── INDEX.md              # This file
+
+reverse/tools/            # 15 tools; see the repo README for the full list
+├── igi_formats.py        # ILFF / BIT / HMP / CTR / CMD / LMP / MEF parsers
+├── verify_formats.py     # runs every parser over an extracted tree
+└── verify_all.py         # end-to-end gate (4 checks)
 ```
 
 ## File Formats
 
 | Format | Extension | Header | Payload | Confidence | Doc |
 |--------|-----------|--------|---------|------------|-----|
-| ILFF | .res | ✅ Verified | ⚠️ Edge cases unknown | HIGH | 08-resources |
-| LOOP v8 | .qvm | ✅ Verified | ⚠️ Bytecode partially mapped | HIGH | 03-scripting |
-| LOOP v9 | .tex | ✅ Verified | ⚠️ Pixel format unclear | HIGH | 07-terrain |
-| LOOP v11 | .res | ✅ Verified | ⚠️ Less tested | MEDIUM | 08-resources |
-| MEF | .res | ⚠️ Nested structure | ❌ Vertex layout unknown | LOW | 08-resources |
-| Heightmap | .bit | ✅ Verified | ⚠️ Flags inferred | HIGH | 07-terrain |
-| Tile Centers | .ctr | ⚠️ Structure known | ⚠️ Flags inferred | MEDIUM | 07-terrain |
-| Tile Commands | .cmd | ❌ Unknown | ❌ Unknown | LOW | 07-terrain |
-| Lightmap | .lmp | ❌ Unknown | ❌ Unknown | LOW | 07-terrain |
-| Navigation | .dat | ✅ Magic verified | ⚠️ Edge format partial | MEDIUM | 05-ai-system |
-| QVM | .qvm | ✅ Verified | ⚠️ Opcodes partial | HIGH | 03-scripting |
+| ILFF | .res | ✅ Verified | ✅ Verified (92/92 files) | HIGH | 08-resources |
+| LOOP v8 | .qvm | ✅ Verified | ✅ Verified | HIGH | 03-scripting |
+| LOOP v9 | .tex | ✅ Verified | ✅ Verified | HIGH | 07-terrain |
+| LOOP v11 | .res | ✅ Verified | ✅ Verified | HIGH | 08-resources |
+| MEF | .res | ✅ Verified | ✅ Vertex layout verified | HIGH | 04-rendering |
+| Texture bitmaps | .bit | ✅ Verified | ✅ Verified (14/14) | HIGH | 07-terrain |
+| Height maps | .hmp | ✅ Verified | ✅ Verified (6/6) | HIGH | 07-terrain |
+| Tile tree | .ctr | ✅ Verified | ✅ Verified (32-byte records) | HIGH | 07-terrain |
+| Tile Commands | .cmd | ✅ Verified | ✅ Verified (indices + packed vertices; flag/`A`/`B` semantics inferred) | HIGH | 07-terrain |
+| Lightmap | .lmp | ✅ Verified | ✅ Verified (14/14) | HIGH | 07-terrain |
+| Navigation | .dat | ✅ Verified | ✅ Verified (routing table `[destination][source] = {next_hop, distance}`) | HIGH | 05-ai-system |
+| MTP | .mtp | ✅ Verified | ✅ Verified (`INST` = model_index + texture_count + gtt_index[]) | HIGH | 12-level-system |
 
 ## Game Systems
 
 | System | Status | Confidence | Key Unknowns | Doc |
 |--------|--------|------------|--------------|-----|
-| Rendering | ⚠️ Partially documented | MEDIUM | Vertex format, pipeline order | 04-rendering |
+| Rendering | ✅ Model + texture formats verified | HIGH | Pipeline order | 04-rendering |
 | AI | ⚠️ Partially documented | MEDIUM | Pathfinding algorithm, grid size | 05-ai-system |
-| Weapons | ⚠️ Partially documented | LOW | Damage values, reload times | 06-weapons |
-| Terrain | ⚠️ Partially documented | MEDIUM | Flag meanings, command encoding | 07-terrain |
-| Resources | ⚠️ Partially documented | HIGH | Nested archive edge cases | 08-resources |
-| Scripting | ⚠️ Partially documented | MEDIUM | Opcode table incomplete | 03-scripting |
-| Audio | ⚠️ Partially documented | MEDIUM | Sample rate, bit depth | 09-audio |
+| Weapons | ✅ Parameters + damage model verified | HIGH | Internal damage-path details | 06-weapons |
+| Terrain | ✅ Formats verified | HIGH | `cmd_transform[0..7]` selection, terrain-grid coordinate space | 07-terrain |
+| Resources | ✅ Container verified | HIGH | Sub-format 32 semantics | 08-resources |
+| Scripting | ✅ Bytecode verified | HIGH | Unemitted opcodes, ALU semantics | 03-scripting |
+| Audio | ✅ Container + encodings verified | HIGH | - | 09-audio |
 | Menus | ⚠️ Partially documented | MEDIUM | Menu hierarchy reconstruction | 10-menus |
 | Tasks | ⚠️ Partially documented | MEDIUM | Task descriptions inferred | 11-task-system |
 | Levels | ⚠️ Partially documented | MEDIUM | Loading sequence inferred | 12-level-system |
@@ -70,7 +77,7 @@ reverse/docs/
 - Game: Project IGI (1999)
 - Developer: Innerloop Studios
 - 14 missions + SHARED
-- ~1,972 files total
+- 1,955 files total
 - Engine version: 0.0.124 (from string analysis)
 
 ### 02-executable
@@ -80,45 +87,52 @@ reverse/docs/
 - DirectX 7 (from DLL imports)
 
 ### 03-scripting
-- QVM bytecode VM (structure verified, opcodes partial)
-- 22 events, 17 actions (from string analysis)
-- Event-driven architecture (inferred)
+- QVM header: `"LOOP"` + version 8 + 5 interleaved (offset, size) pairs (997/997 files)
+- Sections: symbol offsets, symbol names, string offsets, string constants, code
+- 1-byte opcode + fixed-size operand; 49 names from `IGI.exe` @ 0x148394, numbering reversed
+- 25 opcodes appear in retail data, all proven; 997/997 files disassemble clean
+- 24 events confirmed; the "17 actions" claim is wrong (18 `AIAction_*` / 37 `AIFunction_*` defined, 12 / 30 used)
 - ~997 script files (from filesystem)
 
 ### 04-rendering
 - DirectX 7 (from DLL imports)
-- Terrain + models + particles + HUD (inferred from file types)
-- Pipeline order reconstructed, not verified
-- Triangle count unknown (estimated ~150K)
+- Model vertex: 40 bytes (pos, normal, uv, lightmap uv) for 6,178 models; 32 bytes (no lightmap uv) for 617 - verified by unit-length normals
+- Box vertex: 16 bytes; box faces: 8-byte records indexing them
+- MEF chunk tags are byte-reversed 4CCs
+- Texture texel encoding verified: ARGB1555 (code 2), A8R8G8B8 (code 3), A8R8G8B8 + mips (code 67)
 
 ### 05-ai-system
 - Behavior tree architecture (inferred, not verified)
-- A* pathfinding (assumed, not confirmed)
+- Navigation: precomputed routing table, next hop per `[destination][source]` - verified
 - 20-50 NPCs per level (estimated)
 - 3 difficulty levels (from configuration)
 
 ### 06-weapons
-- 21 weapons (from QVM analysis)
-- 8 categories (from QVM analysis)
-- 5 ammo types (from QVM analysis)
-- Damage values, reload times unverified
+- 24 weapons (directory listing of `pc/weapons/`; the earlier 21-weapon list was guessed and wrong)
+- 14 ammo types (directory listing of `pc/ammo/`)
+- 50-parameter schema; all values extracted to `reverse/data/weapon_table.tsv`
+- Damage formula recovered: `hitzone_multiplier[hitzone] * DamageFactor`; penetration gates continuation
 
 ### 07-terrain
-- Heightmap: 16 bytes/entry (verified via hex dump)
-- Tile centers: 52 bytes/entry (partially verified)
-- Tile commands: binary encoding unknown
-- Lightmap: pixel format unknown
+- `.bit`: 256-slot descriptor table + `size*size` bits per slot (14/14 exact)
+- `.hmp`: 256-slot descriptor table + `(size+1)^2` bytes per slot (6/6 exact)
+- `.ctr`: 32-byte tile-tree records with a `cmd_offset` into `.cmd`
+- `.cmd`: byte stream addressed by `.ctr` offsets; triangle descriptors and packed vertex entries verified
+- `.lmp`: size-prefixed 8-bit greyscale images (14/14 exact)
+- `.tex`: LOOP v9, 18 textures in level 1, all 128x128 ARGB1555
 
 ### 08-resources
-- ILFF container format (header verified)
-- IRESNAME + BODY pairs (structure known)
-- Nested archives for models (edge cases untested)
-- No compression/checksums (verified)
+- ILFF container fully verified: 92/92 archives, 90,893 chunks
+- Chunk advance is `align4(offset + id_field + 12 + extra + size)`, not the `total` field
+- `BODY` payloads are nested ILFF (models) or LOOP (textures)
+- Sub-format 32 (one file) pads the nested LOOP to a 32-byte boundary (243/243 verified)
+- No compression or checksums in any of the 92 files
+- LOOP textures: 8,232 decoded from 118 files, 0 exceptions
 
 ### 09-audio
 - DirectSound primary (from imports)
 - WINMM mixer (from imports)
-- RIFF/WAV format (standard assumption)
+- ILSF container (custom), not RIFF/WAVE; 16-bit PCM and IMA ADPCM
 - AVI cutscene playback (from imports)
 
 ### 10-menus
@@ -131,12 +145,12 @@ reverse/docs/
 - 64 task types (from string analysis)
 - Descriptions inferred from names
 - Vehicle hierarchy assumed
-- Hit multipliers unverified
+- Hitzone multipliers verified (17 x 16-byte entries; head 100.0)
 
 ### 12-level-system
-- 9 missions documented (from filesystem)
+- 14 levels + `common` documented (from filesystem)
 - Loading sequence reconstructed
-- Navigation graph structure partial
+- Navigation graph decoded: name-hashed records + routing table
 - Terrain grid 64x64 (from file size)
 
 ### 13-implementation
@@ -146,7 +160,7 @@ reverse/docs/
 - See STATUS.md for unknowns
 
 ### 14-lod-system
-- ~400 models (from LOD.QVM)
+- 462 models (from `lod.qvm`)
 - 5 LOD levels + cutoff
 - Category ranges inferred
 - Distance thresholds unverified
@@ -159,27 +173,34 @@ reverse/docs/
 
 ## Known Issues
 
-1. **MEF vertex format** - Chunk IDs known, vertex layout completely unknown
-2. **Texture UV mapping** - No UV coordinates documented
-3. **Lightmap format** - Pixel format, UV mapping, blending all unknown
-4. **QVM opcodes** - Only partially mapped, many opcodes unidentified
-5. **Weapon parameters** - Damage, timing, spread values are estimates
-6. **NPC statistics** - Health, damage, perception values are guesses
+1. **`.cmd` triangle flag / vertex `A`/`B` fields** - packing proven; the flag high nibble (material index) and `A`/`B` semantics are inferred
+2. **`DNER` / `OCEMHSEM` leftover fields** - `+0x7C`/`+0x7E`/DNER `+0x18` consumed; mesh `+0x0C`..`+0x1C` and render `+0x1A`/`+0x1E` consumers not located
+3. **`cmd_transform[0..7]`** - the unused/present rule is proven; what `0..7` selects is not
+4. **QVM leftovers** - unemitted opcodes resolved; the reversed numbering and the `PUSHA` intent remain open
+5. **Weapon parameters** - all 24 x 50 values extracted and the damage formula recovered; some internal damage-path details remain
+6. **NPC statistics** - health, damage, perception values are guesses
+7. **Terrain-grid / level-script coordinate space** - not in the 1/4096 m unit; its scale is not determined
 
 ## Legal
 
 - No game assets included
-- Static analysis only (no runtime verification)
+- Format analysis performed against a legally owned retail copy
 - For educational purposes
 - Users must own original game
 
 ## Status
 
-Static analysis done, runtime unknowns remain. No plans to continue engine development.
+Container, terrain, model, texture, bytecode, audio, font, navigation, manifest and
+animation formats verified against the retail data, every format anchored to its loader
+in `IGI.exe`, the weapon damage formula recovered, and the world scale proven
+(4096 units = 1 m). The remaining open items are listed above. No plans to continue
+engine development.
 
 ## References
 
 - Original game: Project IGI (1999)
 - Developer: Innerloop Studios
 - Publisher: Eidos Interactive
-- Analysis tools: Hex dump, symbol analysis, string analysis
+- Analysis tools: `reverse/tools/` (`igi_formats.py`, `loop.py`, `qvm.py`,
+  `verify_formats.py`, `verify_all.py`, `adversarial_checks.py`, `exe_dis.py`)
+- Byte-level evidence: [16-verified-formats](16-verified-formats/README.md)

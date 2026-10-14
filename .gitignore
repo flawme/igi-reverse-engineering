@@ -17,6 +17,8 @@ target/
 *.so
 *.dylib
 *.exe
+__pycache__/
+*.pyc
 
 # Editor/IDE
 .vscode/

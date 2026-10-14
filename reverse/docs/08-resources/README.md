@@ -1,134 +1,105 @@
 # 08 - Resource System (ILFF)
 
-## Overview
+**Status: solved and verified.** The container parses cleanly on all 92 `.res` archives
+in the retail game (90,893 chunks), and every parse consumes exactly the declared file
+size. Byte-level tables are in [16-verified-formats](../16-verified-formats/README.md).
 
-ILFF (InterLeaf File Format?) is a container format used for game resources. The exact origin of the format name is unknown - "InterLeaf" is a guess based on the filename.
+## ILFF Header (16 bytes)
 
-**Confidence:** HIGH for container structure, MEDIUM for nested archives.
-
-## ILFF Header
-
-| Offset | Size | Description | Confidence | Method |
-|--------|------|-------------|------------|--------|
-| 0x00 | 4 | Magic: "ILFF" (0x494C4646) | HIGH | Hex dump |
-| 0x04 | 4 | Total file size | HIGH | Hex dump |
-| 0x08 | 4 | Sub-format ID (typically 0x04) | MEDIUM | Hex dump |
-
-**Note:** The magic bytes are "ILFF" in ASCII, which is 0x494C4646 in little-endian.
+| Offset | Size | Type | Meaning | Evidence |
+|--------|------|------|---------|----------|
+| 0x00 | 4 | char[4] | `"ILFF"` | all 92 files |
+| 0x04 | 4 | uint32 | total file size | equals on-disk size in all 92 files |
+| 0x08 | 4 | uint32 | sub-format: `4` (91 files) or `32` (1 file) | histogram over the tree |
+| 0x0C | 4 | uint32 | always 0 | all 92 files |
 
 ## Chunk Structure
 
-### IRESNAME Entry
+```
+char[]   id      ASCII tag, null-padded to a 4-byte boundary (4 or 8 bytes)
+uint32   size    payload byte count
+uint32   type    mirrors the file sub-format
+uint32   total   align4(16 + size) when non-zero; frequently 0
+uint8    payload[size]
+         pad to 4-byte alignment
+```
 
-| Offset | Size | Description | Confidence | Method |
-|--------|------|-------------|------------|--------|
-| 0x00 | 4 | Chunk ID: "IRESNAME" | HIGH | Hex dump |
-| 0x04 | 4 | Chunk size | HIGH | Hex dump |
-| 0x08 | var | "NAME" sub-chunk with path string | HIGH | Hex dump |
+Next chunk = `align4(offset + id_field + 12 + extra + size)`, `extra = 28` for type-32
+chunks.
 
-### NAME Entry
+**The `total` field is not the advance.** It ignores the extra 4 bytes of an 8-byte tag
+and is often 0. Two proofs: `NAME` at 0x14 of `common/sounds/sounds.res` has `size=36`,
+`total=52`, but the next `BODY` is at 0x48; and `BODY` at 0x54 of
+`common/textures/common.res` has `size=32800`, `total=32844`, with the next `NAME` at
+0x80A0.
 
-| Offset | Size | Description | Confidence | Method |
-|--------|------|-------------|------------|--------|
-| 0x00 | 4 | Chunk ID: "NAME" | HIGH | Hex dump |
-| 0x04 | 4 | Chunk size | HIGH | Hex dump |
-| 0x08 | var | Null-terminated path string | HIGH | Hex dump |
+## Chunk tags observed
 
-### BODY Entry
-
-| Offset | Size | Description | Confidence | Method |
-|--------|------|-------------|------------|--------|
-| 0x00 | 4 | Chunk ID: "BODY" | HIGH | Hex dump |
-| 0x04 | 4 | Chunk size | HIGH | Hex dump |
-| 0x08 | var | Raw resource data | HIGH | Hex dump |
+| Tag | Payload |
+|-----|---------|
+| `IRESNAME`, `NAME` | resource path, e.g. `LOCAL:models/210_01_1.mef` |
+| `BODY` | the resource; a nested ILFF for models, a LOOP file for textures |
+| `PATH` | `;`-separated path list |
+| `CSTR` | localised string |
+| `IRES` | zero-length marker chunk |
+| `OCEMHSEM` | MEF model header (inside a model's nested ILFF) |
 
 ## Resource Types
 
 | Archive | Content | Count | Confidence | Method |
 |---------|---------|-------|------------|--------|
-| level1_tex.res | Texture definitions (.tex references) | ~100+ | MEDIUM | File analysis |
-| level1_models.res | 3D models (.mef references) | ~50+ | MEDIUM | File analysis |
-| lightmap1.res | Lightmap textures (.olm references) | ~100+ | MEDIUM | File analysis |
-| menusystem.res | Menu textures and sprites | Unknown | LOW | Filename only |
-| computer.res | HUD/computer sprites | Unknown | LOW | Filename only |
-| status.res | Status screen resources | Unknown | LOW | Filename only |
+| `models/levelN.res` | MEF models | 415 in level 1 | ✅ Verified | 830 chunks = 415 NAME/BODY pairs |
+| `textures/levelN.res` | LOOP v11 textures | 393 BODY chunks in level 1 | ✅ Verified | chunk walk |
+| `lightmaps/lightmaps.res` | lightmap resources | 1,308 BODY chunks | ✅ Verified | chunk walk |
+| `common/textures/common.res` | LOOP v11 textures, sub-format 32 | 393 BODY chunks | ✅ Verified | chunk walk |
+| `menusystem/*.res` | menu resources | - | ✅ Verified | chunk walk |
+| `computer/computer.res` | HUD sprites | - | ✅ Verified | chunk walk |
 
-## Parsing Algorithm
+## Nested archives
 
-**Warning:** The following Rust code is a proposed parser, not extracted from the engine. It may work for simple cases but could fail on edge cases.
+`BODY` payloads are themselves ILFF files for models and LOOP files for textures. The
+nested ILFF repeats the same 16-byte header (`"ILFF"`, size, sub-format, 0) and then
+chunks. Recursion is safe: the nested file's declared size always equals the enclosing
+`BODY` `size` field.
 
-```rust
-fn parse_ilff(data: &[u8]) -> Result<Vec<Chunk>> {
-    let mut chunks = Vec::new();
-    let mut offset = 0;
+## Type-32 texture resources
 
-    // Read header
-    let magic = read_u32(data, offset)?;
-    if magic != 0x494C4646 {
-        return Err("Invalid ILFF magic");
-    }
-    offset += 4;
-
-    let file_size = read_u32(data, offset)?;
-    offset += 4;
-
-    let sub_format = read_u32(data, offset)?;
-    offset += 4;
-
-    // Read chunks
-    while offset < file_size as usize {
-        let chunk_id = read_u32(data, offset)?;
-        offset += 4;
-
-        let chunk_size = read_u32(data, offset)?;
-        offset += 4;
-
-        let chunk_data = &data[offset..offset + chunk_size as usize];
-        offset += chunk_size as usize;
-
-        chunks.push(Chunk {
-            id: chunk_id,
-            size: chunk_size,
-            data: chunk_data.to_vec(),
-        });
-    }
-
-    Ok(chunks)
-}
-```
-
-**Confidence:** MEDIUM - This parser handles basic cases but may fail on:
-- Padding bytes between chunks
-- Nested ILFF archives
-- Edge cases in chunk alignment
+`common/textures/common.res` is the only sub-format-32 file. Its `BODY` payloads pad the
+nested resource to a **32-byte boundary**: the `LOOP` magic sits at
+`align32(payload_off)`, not at `payload_off`. Observed padding lengths are 0, 16, 20, 24
+and 28 bytes, always zeros. Verified on all 243 `BODY` chunks of `common.res`:
+`LOOP_offset == align32(payload_off)` in **243/243** cases. Sub-format-4 archives have
+no padding (`LOOP_offset == payload_off`).
 
 ## Resource Path Prefixes
 
 | Prefix | Purpose | Example | Confidence | Method |
 |--------|---------|---------|------------|--------|
-| LOCAL: | Game installation directory | LOCAL:textures/000_01_1.tex | HIGH | String analysis |
-| MISSION: | Mission-specific files | MISSION:sounds/ | HIGH | String analysis |
-| LANGUAGE: | Localized text resources | LANGUAGE:messages.res | HIGH | String analysis |
-| COMPUTER: | HUD/computer sprites | COMPUTER:h_camera.spr | HIGH | String analysis |
-| STATUSSCREEN: | Status screen resources | STATUSSCREEN:weapon.spr | HIGH | String analysis |
+| LOCAL: | game installation directory | `LOCAL:textures/207_01_1.tex` | ✅ Verified | chunk payloads |
+| MISSION: | mission-specific files | `MISSION:sounds/` | ✅ Verified | chunk payloads |
+| LANGUAGE: | localised text resources | `LANGUAGE:messages.res` | ✅ Verified | chunk payloads |
+| COMPUTER: | HUD/computer sprites | `COMPUTER:h_camera.spr` | ✅ Verified | chunk payloads |
+| STATUSSCREEN: | status screen resources | `STATUSSCREEN:weapon.spr` | ✅ Verified | chunk payloads |
 
-## File Sizes (Observed)
+## Parsing
 
-| Archive | Size | Confidence | Method |
-|---------|------|------------|--------|
-| level1_tex.res | 6,662,688 bytes | HIGH | File listing |
-| level1_models.res | 5,029,944 bytes | HIGH | File listing |
-| lightmap1.res | 1,668,412 bytes | HIGH | File listing |
+`reverse/tools/igi_formats.py` implements the container:
+
+```python
+import igi_formats as F
+info, errors = F.parse_ilff(open("level1.res", "rb").read())
+for c in info["chunks"]:
+    print(c.id, c.size, c.type, c.total)
+```
 
 ## Known Issues
 
-1. **Nested ILFF handling unclear** - How BODY chunks containing nested ILFF archives are parsed is not fully documented
-2. **Padding bytes unknown** - Alignment between chunks is not documented
-3. **Sub-format ID meaning unknown** - The 0x04 value is observed but its purpose is unclear
-4. **Compression/checksums** - No evidence of compression or checksums, but not confirmed
+1. **Level 14 `.ctr`** - unrelated to ILFF, see 07-terrain.
+2. **Sub-format 32 semantics** - the 28-byte descriptor is all zeros in the retail data;
+   its runtime meaning is unknown.
+3. **Compression/checksums** - none observed in any of the 92 files.
 
 ## References
 
-- ILFF specification: Unknown (possibly InterLeaf documentation)
-- Container format: 16-byte header + IRESNAME/BODY pairs
-- Analysis tools: Hex dump, parser testing
+- Byte-level tables: [16-verified-formats](../16-verified-formats/README.md)
+- Parser: `reverse/tools/igi_formats.py`

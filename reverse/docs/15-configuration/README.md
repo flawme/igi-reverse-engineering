@@ -6,35 +6,47 @@ Game configuration stored in CONFIG.QVM. Handles graphics, sound, input, and gam
 
 **Confidence:** HIGH - Configuration options extracted from QVM string analysis.
 
-## Global Options (From QVM strings)
+## Global Options ✅ VERIFIED
 
-| Option | Description | Confidence | Method |
-|--------|-------------|------------|--------|
-| GOStart | Entry point | MEDIUM | String analysis |
-| GOPlayer | Player name | MEDIUM | String analysis |
-| GOActiveMission | Current mission | MEDIUM | String analysis |
-| GOContentControlPW | Parental password | MEDIUM | String analysis |
-| GOGfxDisp | Display adapter | MEDIUM | String analysis |
-| GOGfxDevice | D3D device | MEDIUM | String analysis |
-| GOGfxGamma | Gamma value | MEDIUM | String analysis |
-| GOGfxPerformance | Quality level | MEDIUM | String analysis |
-| GOGameLang | Language | MEDIUM | String analysis |
-| GOGameDiff | Difficulty | MEDIUM | String analysis |
-| GOIsBlood | Blood enabled | MEDIUM | String analysis |
-| GOSoundSpeech | Speech volume | MEDIUM | String analysis |
-| GOSoundMusic | Music volume | MEDIUM | String analysis |
-| GOSoundFX | Effects volume | MEDIUM | String analysis |
-| GOInRemap | Key remap state | MEDIUM | String analysis |
-| GOInMouInv | Invert mouse | MEDIUM | String analysis |
-| GOInMouSens | Mouse sensitivity | MEDIUM | String analysis |
+`config.qvm` decodes to 43 statements. The full list with values is at
+`reverse/data/config_options.tsv`. The defaults the game ships with:
 
-## Difficulty Levels (Observed)
+| Option | Default value | Meaning |
+|--------|---------------|---------|
+| `GOStart` | 0 | entry point |
+| `GOContentControlPW` | (empty) | parental-control password |
+| `GOPlayer` | `Joe` | player name |
+| `GOActiveMission` | 1 | current mission |
+| `GOInMouInv` | 1 | invert mouse |
+| `GOInMouSens` | 0.4 | mouse sensitivity |
+| `GOGfxDisp` | `640, 480, 32` | display mode |
+| `GOGfxDevice` | `{00000000-0000-0000-0000-000000000000}` | D3D device GUID (all-zero = default) |
+| `GOGfxGamma` | 1 | gamma |
+| `GOGfxPerformance` | 0 | graphics detail level |
+| `GOGameLang` | `USA` | language |
+| `GOGameDiff` | `GD_2` | difficulty |
+| `GOIsBlood` | `TRUE` | blood enabled |
+| `GOSoundSpeech` | `1, 1` | speech on, volume |
+| `GOSoundMusic` | `1, 1` | music on, volume |
+| `GOSoundFX` | `1, 1` | effects on, volume |
+| `GOInRemap` | 30 bindings | key/mouse remaps |
 
-| ID | Name | Description | Confidence | Method |
-|----|------|-------------|------------|--------|
-| GD_1 | Easy | Reduced enemy damage/accuracy | MEDIUM | Configuration analysis |
-| GD_2 | Normal | Standard difficulty | HIGH | Configuration analysis |
-| GD_3 | Hard | Increased enemy damage/accuracy | MEDIUM | Configuration analysis |
+The 30 `GOInRemap` bindings are the shipped default controls, e.g.
+`MoveLeft, INPUTPORT_DEVICE_KEYBOARD, KEY_LEFT`,
+`Fire, INPUTPORT_DEVICE_MOUSE, MOUSE_BUTTON_1`,
+`Crouch, INPUTPORT_DEVICE_KEYBOARD, KEY_RIGHT_CTRL`,
+`WeaponCategory1..9, INPUTPORT_DEVICE_KEYBOARD, KEY_1..KEY_9`.
+
+## Difficulty Levels
+
+| ID | Name | Confidence | Method |
+|----|------|------------|--------|
+| GD_1 | Easy | ✅ Verified as a constant; behaviour not verified | config.qvm |
+| GD_2 | Normal | ✅ Verified - this is the shipped default | config.qvm |
+| GD_3 | Hard | ✅ Verified as a constant; behaviour not verified | config.qvm |
+
+The three constants exist and `GD_2` is the default. What each level actually changes
+(damage, accuracy, perception) is not in the config file.
 
 ## Default Key Bindings (From config)
 

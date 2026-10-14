@@ -22,25 +22,31 @@
 
 ### Missions (14 total)
 
-| ID | Name | Difficulty | Confidence | Method |
-|----|------|------------|------------|--------|
-| 1 | LEVEL1 | Tutorial | MEDIUM | Filesystem listing |
-| 2 | LEVEL2 | Easy | MEDIUM | Inferred from progression |
-| 3 | LEVEL3 | Easy | MEDIUM | Inferred from progression |
-| 4 | LEVEL4 | Medium | MEDIUM | Inferred from progression |
-| 5 | LEVEL5 | Medium | MEDIUM | Inferred from progression |
-| 6 | LEVEL6 | Medium | MEDIUM | Inferred from progression |
-| 7 | LEVEL7 | Hard | MEDIUM | Inferred from progression |
-| 8 | LEVEL8 | Hard | MEDIUM | Inferred from progression |
-| 9 | LEVEL9 | Hard | MEDIUM | Inferred from progression |
-| 10 | LEVEL10 | Hard | MEDIUM | Inferred from progression |
-| 11 | LEVEL11 | Very Hard | MEDIUM | Inferred from progression |
-| 12 | LEVEL12 | Very Hard | MEDIUM | Inferred from progression |
-| 13 | LEVEL13 | Very Hard | MEDIUM | Inferred from progression |
-| 14 | LEVEL14 | Extreme | MEDIUM | Inferred from progression |
-| - | SHARED | Common assets | HIGH | Filesystem listing |
+Names verified from the game's own string table (`pc/language/english/missions.res`),
+not inferred. See [12-level-system](../12-level-system/README.md) for the full table
+with descriptions.
 
-**Note:** Difficulty ratings are inferred from mission progression, not verified from game data.
+| ID | Directory | Mission name |
+|----|-----------|--------------|
+| 1 | LEVEL1 | Trainyard |
+| 2 | LEVEL2 | SAM Base |
+| 3 | LEVEL3 | Military Airbase |
+| 4 | LEVEL4 | GOD |
+| 5 | LEVEL5 | Radar Base |
+| 6 | LEVEL6 | Get Priboi |
+| 7 | LEVEL7 | Border Crossing |
+| 8 | LEVEL8 | Re-supply |
+| 9 | LEVEL9 | Missile Trainyard |
+| 10 | LEVEL10 | Defend Priboi |
+| 11 | LEVEL11 | Eagle's Nest I |
+| 12 | LEVEL12 | Eagle's Nest II |
+| 13 | LEVEL13 | Nuclear Infiltration |
+| 14 | LEVEL14 | Finding the bomb |
+| - | common | shared assets (not a mission) |
+
+**Note:** the "SHARED" directory in earlier revisions of this document is
+`missions/location0/common`; there is no `SHARED` directory in the retail tree.
+Difficulty ratings are not present in the game data.
 
 ### Per-Mission Directory Structure
 
@@ -92,12 +98,15 @@ PC/MISSIONS/LOCATI~1/SHARED/
 
 | Type | Count | Description | Confidence | Method |
 |------|-------|-------------|------------|--------|
-| QVM | ~997 | Bytecode scripts | HIGH | Filesystem listing |
-| RES | ~92 | ILFF archives | HIGH | Filesystem listing |
-| TEX | ~26 | Texture packages | HIGH | Filesystem listing |
-| WAV | ~200 | Sound effects | MEDIUM | Estimate from filesystem |
-| Other | ~600 | Config, fonts, etc. | MEDIUM | Estimate |
-| **Total** | **~1,972** | | HIGH | Filesystem listing |
+| QVM | 997 | Bytecode scripts | HIGH | Filesystem listing |
+| WAV | 413 | ILSF sound samples | HIGH | Filesystem listing |
+| DAT | 317 | Navigation graphs (300) + level manifests | HIGH | Filesystem listing |
+| RES | 92 | ILFF archives | HIGH | Filesystem listing |
+| TEX | 26 | Texture packages | HIGH | Filesystem listing |
+| MTP | 17 | Level manifests | HIGH | Filesystem listing |
+| LMP / CTR / CMD / BIT | 14 each | Terrain data | HIGH | Filesystem listing |
+| Other | 37 | Fonts, cutscenes, config, etc. | HIGH | Filesystem listing |
+| **Total** | **1,955** | | HIGH | Filesystem listing |
 
 ## AFP Archives (PC/AFPS/)
 

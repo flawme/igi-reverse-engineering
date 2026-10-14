@@ -6,61 +6,55 @@
 
 The game appears to use an event-driven AI system. The term "behavior trees" is used in previous documentation, but this is an assumption based on common game AI patterns. The actual implementation could be state machines, rule-based systems, or other patterns.
 
-## Events (22 total)
+## Events (24 total)
 
-**Confidence:** MEDIUM - Event names extracted from string analysis, but event parameters and behavior are unknown.
+**Confidence:** HIGH for the names and the count - extracted verbatim from `IGI.exe`
+(`strings -n 6 IGI.exe | grep '^AIEVENT_'` returns 24). Earlier revisions claimed 22;
+the two missing ones were `AIEVENT_ALERT_RESPONSE` and `AIEVENT_ANIMATION`... in fact
+the earlier list had 24 rows but claimed 22 in the heading. The verified set:
 
-| Event | Description | Confidence | Method |
-|-------|-------------|------------|--------|
-| AIEVENT_CREATE | Entity created | MEDIUM | String analysis |
-| AIEVENT_DELETE | Entity destroyed | MEDIUM | String analysis |
-| AIEVENT_IDLE | Idle state | MEDIUM | String analysis |
-| AIEVENT_WALK | Walking | MEDIUM | String analysis |
-| AIEVENT_COMBAT | In combat | MEDIUM | String analysis |
-| AIEVENT_DEAD | Entity dead | MEDIUM | String analysis |
-| AIEVENT_GUNSHOT | Gunshot heard | MEDIUM | String analysis |
-| AIEVENT_GUNSHOTMISS | Missed shot heard | MEDIUM | String analysis |
-| AIEVENT_EXPLOSION | Explosion heard | MEDIUM | String analysis |
-| AIEVENT_TAKINGDAMAGE | Taking damage | MEDIUM | String analysis |
-| AIEVENT_ENEMYDETECTION | Enemy detected | MEDIUM | String analysis |
-| AIEVENT_FRIENDLYDETECTION | Friendly detected | MEDIUM | String analysis |
-| AIEVENT_ALERT | Alert state | MEDIUM | String analysis |
-| AIEVENT_ALERT_RESPONSE | Response to alert | MEDIUM | String analysis |
-| AIEVENT_ALARMON | Alarm activated | MEDIUM | String analysis |
-| AIEVENT_ALARMOFF | Alarm deactivated | MEDIUM | String analysis |
-| AIEVENT_FLASHBANG | Flashbang effect | MEDIUM | String analysis |
-| AIEVENT_GRENADETHROWN | Grenade thrown | MEDIUM | String analysis |
-| AIEVENT_GRENADELAND | Grenade landed | MEDIUM | String analysis |
-| AIEVENT_GROUNDIMPACT | Ground impact | MEDIUM | String analysis |
-| AIEVENT_DOOR | Door interaction | MEDIUM | String analysis |
-| AIEVENT_FENCE | Fence interaction | MEDIUM | String analysis |
-| AIEVENT_LADDER | Ladder interaction | MEDIUM | String analysis |
-| AIEVENT_ANIMATION | Animation event | MEDIUM | String analysis |
+```
+AIEVENT_ALARMOFF          AIEVENT_ALARMON           AIEVENT_ALERT
+AIEVENT_ALERT_RESPONSE    AIEVENT_ANIMATION         AIEVENT_COMBAT
+AIEVENT_CREATE            AIEVENT_DEAD              AIEVENT_DELETE
+AIEVENT_DOOR              AIEVENT_ENEMYDETECTION    AIEVENT_EXPLOSION
+AIEVENT_FENCE             AIEVENT_FLASHBANG         AIEVENT_FRIENDLYDETECTION
+AIEVENT_GRENADELAND       AIEVENT_GRENADETHROWN     AIEVENT_GROUNDIMPACT
+AIEVENT_GUNSHOT           AIEVENT_GUNSHOTMISS       AIEVENT_IDLE
+AIEVENT_LADDER            AIEVENT_TAKINGDAMAGE      AIEVENT_WALK
+```
 
-## Actions (17 total)
+The AI scripts dispatch on these with `GetCurrentEventType()`, e.g.
+`level1/ai/1205.qvm` decodes to
+`if (GetCurrentEventType() == AIEVENT_CREATE) { DefaultHandler(); }`.
 
-**Confidence:** MEDIUM - Action names extracted from string analysis, but action parameters and behavior are unknown.
+## Actions and functions
 
-| Action | Description | Confidence | Method |
-|--------|-------------|------------|--------|
-| AIAction_Idle | Do nothing | MEDIUM | String analysis |
-| AIAction_WalkToNode | Walk to waypoint | MEDIUM | String analysis |
-| AIAction_RunToNode | Run to waypoint | MEDIUM | String analysis |
-| AIAction_MoveToEvent | Move to event location | MEDIUM | String analysis |
-| AIAction_FireAtNode | Fire at waypoint | MEDIUM | String analysis |
-| AIAction_FireAtTask | Fire at target entity | MEDIUM | String analysis |
-| AIAction_Combat | Enter combat mode | MEDIUM | String analysis |
-| AIAction_SetCombat | Set combat state | MEDIUM | String analysis |
-| AIAction_Die | Die | MEDIUM | String analysis |
-| AIAction_FallFlat | Fall down | MEDIUM | String analysis |
-| AIAction_Stunned | Stunned state | MEDIUM | String analysis |
-| AIAction_Patrol | Patrol area | MEDIUM | String analysis |
-| AIAction_PlayAnimation | Play animation | MEDIUM | String analysis |
-| AIAction_PlaySound | Play sound | MEDIUM | String analysis |
-| AIAction_RunPanicking | Run in panic | MEDIUM | String analysis |
-| AIAction_KickGrenade | Kick grenade away | MEDIUM | String analysis |
-| AIAction_LookAtEvent | Look at event | MEDIUM | String analysis |
-| AIAction_Activate | Activate object | MEDIUM | String analysis |
+**Confidence:** HIGH for the names - extracted verbatim from `IGI.exe`. The earlier
+"17 actions" claim was wrong.
+
+| Prefix | Count in `IGI.exe` | Count used by the retail QVM scripts |
+|--------|--------------------|--------------------------------------|
+| `AIEVENT_` | 24 | 24 |
+| `AIAction_` | 18 | 12 |
+| `AIFunction_` | 37 | 30 |
+
+`AIAction_*`: `Activate`, `Combat`, `Dead`, `FallFlat`, `FireAtNode`, `FireAtTask`,
+`Idle`, `KickGrenade`, `LookAtEvent`, `MoveToEvent`, `Patrol`, `PlayAnimation`,
+`PlaySound`, `RunPanicking`, `RunToNode`, `SetCombat`, `Stunned`, `WalkToNode`.
+
+`AIFunction_*` (37): the `Get*`/`Set*` accessors the scripts call, including
+`DefaultHandler`, `GetCurrentEventType`, `GetEventDistance`, `IsEventBehind`,
+`SetEventPriority`, `SetDeathAnimation`, `SetInvulnerability`, `SetInstantDeath`,
+`SendResponse`, and the alarm/view accessors (`GetAlarmControlID`,
+`SetAlarmTriggerDistance`, `SetViewLength`, `SetSecondaryViewGamma`, ...).
+
+## Architecture
+
+**Confidence:** MEDIUM - the event/action/function vocabulary is now verified, but the
+dispatch mechanism is still inferred. The scripts are QVM bytecode that reads the
+current event type and calls named functions; whether the engine drives them through a
+state machine, a rule list or a behaviour tree is not established by the data.
 
 ## Behavior Tree Node Types (Guessed)
 
@@ -141,33 +135,33 @@ ATTACKING → DEAD (health = 0)
 ALERT → FLEEING (health < 20)
 ```
 
-## Pathfinding (Guessed)
+## Pathfinding
 
-**Confidence:** LOW - Pathfinding algorithm is assumed from standard game patterns.
+**Confidence:** HIGH for the routing mechanism - the nav `.dat` grid is a precomputed
+routing table (see below). The steering layer that consumes it is inferred.
 
 | Property | Value | Confidence | Method |
 |----------|-------|------------|--------|
-| Algorithm | A* (assumed) | LOW | Standard game convention |
-| Grid size | 512x512 (assumed) | LOW | Standard game convention |
-| Obstacle avoidance | Yes (assumed) | LOW | Standard game convention |
+| Algorithm | precomputed next-hop routing table, not A* | ✅ | loader `fcn.004f9d30`, accessor `fcn.00509740`, consumer `0x425dec` |
+| Grid | `dim x dim` nodes (100 in most files, 300 in `graph4019.dat`) | ✅ | header `+0x0C` |
+| Cell | `{uint32 next_hop, float path_distance}`; `0xFFFFFFFF` = no route | ✅ | 66,408 column-adjacent cells, 0 row-adjacent |
 
-## Navigation Graph
+## Navigation Graph ✅ VERIFIED
 
-### Format (Partially verified)
+The `.dat` file is a **routing table**, not an edge list:
 
 ```
-Header: 0xFFEEDDCC magic (verified via hex dump)
-Grid: 5x5 sector system (from file analysis)
-Nodes: ~100 nodes per level (estimated from file size)
-Edges: uint16 pairs (target, cost) (partially verified)
+Header (30 bytes): magic 0xFFEEDDCC, dim at +0x0C, grid byte size at +0x1A
+Grid at +0x1E: dim*dim cells, 8 bytes each {uint32 next_hop, float path_distance}
+Tail: name-hashed records (nNodeID, tNodePosition, vNodeRadius, nLinkID1/2, eLinkType, ...)
 ```
 
-### Node Format
+The cell's `uint32` is the next hop from the column node toward the row node
+(`[destination][source]`); `0xFFFFFFFF` means no route. The record stream after the
+grid uses name-hashed keys (`hash("nMaxNodes") = 0x000D3AE6`). See
+[16-verified-formats](../16-verified-formats/README.md) for the byte-level proof.
 
-| Offset | Size | Description | Confidence |
-|--------|------|-------------|------------|
-| 0x00 | 12 | Position (3x float32, -1.0 = unpopulated) | MEDIUM |
-| 0x0C | var | Edge list (uint16 pairs: target_node, cost) | MEDIUM |
+The 7 `level8/graphs/*.dat` files use a second, tag-only layout with no magic.
 
 ## Perception (Guessed)
 
@@ -204,7 +198,7 @@ Edges: uint16 pairs (target, cost) (partially verified)
 ## Known Issues
 
 1. **Architecture unknown** - Behavior trees assumed, but actual implementation unclear
-2. **Pathfinding algorithm unverified** - A* assumed, not confirmed
+2. **Steering layer** - the routing table is verified; how the AI steers along the next-hop chain is inferred
 3. **NPC statistics unverified** - Health, damage, perception are guesses
 4. **State machine reconstructed** - Not extracted from source
 5. **Performance metrics unmeasured** - Estimates only

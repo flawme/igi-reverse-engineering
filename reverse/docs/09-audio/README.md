@@ -1,128 +1,158 @@
 # 09 - Audio System
 
-## Technology
+## Technology Stack
 
 | Component | Technology | Confidence | Method |
 |-----------|------------|------------|--------|
-| Primary | DirectSound | HIGH | DLL import analysis |
-| Mixing | WINMM mixer API | HIGH | DLL import analysis |
-| Media Control | mciSendCommandA | HIGH | DLL import analysis |
-| Cutscenes | AVIFIL32.dll + MSVFW32.dll | HIGH | DLL import analysis |
+| Primary API | DirectSound | ✅ Verified | DLL import analysis |
+| Mixing API | WINMM | ✅ Verified | DLL import analysis |
+| Cutscene API | AVIFIL32.dll | ✅ Verified | DLL import analysis |
+| Sample container | **ILSF** (custom) | ✅ Verified | 759/759 payloads + the loader in `IGI.exe` |
 
-## Sound Classes (Reconstructed)
+## Sample Format: ILSF ✅ VERIFIED
 
-**Confidence:** MEDIUM - Class names extracted from string analysis, but hierarchy is reconstructed.
+**Every audio file in the game is ILSF, not RIFF/WAVE.** Earlier revisions of this
+document said "RIFF/WAV (PCM assumed)" - that is wrong. `python3 -c "import wave;
+wave.open(f)"` fails with "file does not start with RIFF id" on all 413 loose `.wav`
+files, and the first-4-bytes histogram over them is `{b'ILSF': 413}`.
 
-| Class | Description | Confidence | Method |
-|-------|-------------|------------|--------|
-| SoundManager | Master audio controller | MEDIUM | String analysis |
-| SoundSysController | System-level audio | MEDIUM | String analysis |
-| SoundSysDef | Sound definition | MEDIUM | String analysis |
-| SoundSysDefParent | Parent sound definition | MEDIUM | String analysis |
-| SoundSysMicrophone | 3D audio listener | MEDIUM | String analysis |
-| SoundDefGraph | Graph-based sound | MEDIUM | String analysis |
-| SoundDefGroup | Sound group | MEDIUM | String analysis |
-| SoundDefSound | Individual sound | MEDIUM | String analysis |
-| SoundDefTriggerOnce | One-shot trigger | MEDIUM | String analysis |
+The same container also holds the 346 `BODY` payloads of the two sound `.res`
+archives, for **759 ILSF payloads total, 0 exceptions**.
 
-## Audio API Functions
+### Header (20 bytes)
 
-| Function | Description | Confidence | Method |
-|----------|-------------|------------|--------|
-| Game_DisableMusic | Stop music playback | HIGH | Symbol analysis |
-| Game_EnableMusic | Start music playback | HIGH | Symbol analysis |
-| Game_SetMusicVolume | Set music volume (0-100) | HIGH | Symbol analysis |
-| Game_SetSFXVolume | Set SFX volume | HIGH | Symbol analysis |
-| Game_UpdateVolume | Refresh all volumes | HIGH | Symbol analysis |
+| Offset | Size | Type | Meaning | Evidence |
+|--------|------|------|---------|----------|
+| 0x00 | 4 | char[4] | `"ILSF"` | 759/759 |
+| 0x04 | 2 | uint16 | version: 0/2 = loose `.wav`, 1/3 = inside a `.res` `BODY` | 759/759, perfect correlation with the container |
+| 0x06 | 2 | uint16 | bits per sample - **always 16** | 759/759 |
+| 0x08 | 2 | uint16 | channel count (1 or 2) | 759/759 |
+| 0x0A | 2 | uint16 | flags: `0` for loose files, `0x1002` for `.res` members | 759/759, constant per version |
+| 0x0C | 4 | uint32 | sample rate: 11025 / 22050 / 44100 | 759/759 |
+| 0x10 | 4 | uint32 | frame count (samples **per channel**) | see below |
+| 0x14 | | | sample data | |
 
-## Audio File Format
+### Versions and encodings
 
-Standard RIFF/WAV PCM format:
-- Header: "RIFF" + size + "WAVE"
-- Format chunk: "fmt " + format info
-- Data chunk: "data" + PCM samples
+| Version | Count | Where | Encoding |
+|---------|-------|-------|----------|
+| 0 | 3 | loose `.wav` | 16-bit PCM |
+| 1 | 338 | `.res` `BODY` | 16-bit PCM |
+| 2 | 410 | loose `.wav` | 4-bit IMA ADPCM |
+| 3 | 8 | `.res` `BODY` | 4-bit IMA ADPCM |
 
-**Confidence:** MEDIUM - Standard WAV format assumed. Actual compression (PCM vs ADPCM) is unknown.
+Loose files use 11025, 22050 and 44100 Hz; `.res` members use 22050 and 44100 Hz.
+Channel counts are 1 or 2 in both.
 
-## Sound Categories (Inferred)
+### The decoder is in the executable
 
-| Category | Examples | Confidence | Method |
-|----------|---------|------------|--------|
-| Ambient | M*_AMB*.WAV, M*_WIND.WAV | MEDIUM | Filename analysis |
-| Music | game_music, menu_music | MEDIUM | Filename analysis |
-| Weapon | Fire, reload, impact sounds | MEDIUM | Filename analysis |
-| Voice | Communication, radio | MEDIUM | Filename analysis |
-| Effects | Explosion, footsteps | MEDIUM | Filename analysis |
-| UI | Menu clicks, beeps | MEDIUM | Filename analysis |
+`"ILSF"` occurs exactly once in `IGI.exe`, at file offset `0x95E36` (VA `0x495E36`):
 
-## Per-Level Sounds
-
-Each level has unique sounds in:
 ```
-MISSION:sounds/
+8b 06           mov  eax, [esi]
+3d 49 4c 53 46  cmp  eax, 0x46534C49        ; "ILSF"
+74 1b           je   0x495E58               ; -> the loader
 ```
 
-Examples (from filesystem):
-- BIRD_01.WAV, BIRD_02.WAV, BIRD_03.WAV
-- M5_BEEPS.WAV, M5_CAR.WAV
-- _CUT05~1.WAV through _CUT05~5.WAV
+The header layout above was read from that loader, not inferred.
 
-**Confidence:** HIGH - Observed from extracted files.
+### Decoding
 
-## Sound Configuration
+`reverse/tools/misc.py` decodes ILSF to a playable WAV (stdlib `wave`). Verified
+outputs include `game_music.wav` (12.8 MB), `menu_music.wav` (6.7 MB) and the full set
+of footstep, weapon and UI samples.
 
-Defined in sounds.qsc per level:
-```
-LOCAL:common/sounds/
-MISSION:sounds/
-```
+## Loader evidence (IGI.exe)
 
-**Confidence:** HIGH - From QVM script analysis.
+The ILSF loader is `0x495e00`; the magic compare `cmp eax, 0x46534c49` ("ILSF")
+is at `0x495e36`. Static disassembly settles the three open questions above.
 
-## Cutscene Audio
+### The `flags` field (`+0x0A`) controls nothing
 
-AVI files paired with WAV files:
-- EIDOS.AVI + EIDOS.WAV
-- INNERL~1.AVI + INNERL~1.WAV
-- INTRO_US.AVI + INTRO_US.WAV
-- OUTRO.AVI + OUTRO.WAV
-- VP.AVI + VP.WAV
+✅ Verified: the loader copies the whole 20-byte header to `obj+0x10`
+(`0x495ec7 rep movsd`) but never reads the flags word. The only header fields it
+reads are:
 
-**Confidence:** HIGH - Observed from extracted files.
+| Field | Read at |
+|-------|---------|
+| `+0x14` version | `0x495ec9` |
+| `+0x16` bits | `0x495fdf` |
+| `+0x18` channels | `0x495fdb` |
+| `+0x1c` rate | `0x495fc8` |
+| `+0x20` frames | `0x495f3b` |
 
-## Cutscene Playback (Reconstructed)
+An exhaustive `.text` scan for every memory operand with displacement `0x1a`
+found **11 hits, none in the sound module `0x495000`-`0x497000`**. The only
+`0x1002` immediate in `.text` is `LOCALE_ILANGUAGE` for `GetLocaleInfoA` at
+`0x48eea4`.
 
-**Confidence:** MEDIUM - API call sequence reconstructed from function names.
+So the flags word is **authoring metadata** - written by the packing tool and
+never consumed. Only the container correlation is provable: `0` for loose
+`.wav`, `0x1002` for `.res` members.
 
-1. AVIFileInit() - Initialize
-2. AVIFileOpenA() - Open .avi file
-3. AVIFileGetStream() - Get video stream
-4. AVIStreamInfoA() - Stream properties
-5. AVIStreamRead() - Read frames
-6. ICDecompress() - Decode (via MSVFW32.dll)
-7. AVIFileExit() - Cleanup
+### The version field is a bitfield
 
-## Cutscene Files (Observed)
+✅ Verified. The loader switches on the version word (`0x495ec9` /
+`0x495ed9 jmp dword [eax*4 + 0x4960d0]`) and the table at `0x4960d0` is:
 
-| File | Content | Confidence | Method |
-|------|---------|------------|--------|
-| EIDOS.AVI/WAV | Eidos logo | HIGH | File listing |
-| INNERLOGIC.AVI/WAV | Developer logo | HIGH | File listing |
-| INTRO_US.AVI/WAV | US intro | HIGH | File listing |
-| OUTRO.AVI/WAV | Ending | HIGH | File listing |
-| VP.AVI/WAV | Victory Pictures logo | HIGH | File listing |
+| Index | Target | Meaning |
+|-------|--------|---------|
+| 0 | `0x495ee0` | loose |
+| 1 | `0x495f95` | archived |
+| 2 | `0x495ee0` | loose |
+| 3 | `0x495f30` | archived |
 
-## Known Issues
+`v0 == v2` and `v1 != v3`, so the loader branches on **bit0 only**:
+bit0 = "inside a `.res` archive". **bit1 = IMA ADPCM**, consumed in the
+streaming path: `0x496a47 cmp word [ecx+0x14], 2` -> `0x496b70` (ADPCM) /
+`0x496c10` (PCM).
 
-1. **Sample rate unknown** - Not extracted from WAV files
-2. **Bit depth unknown** - Not extracted from WAV files
-3. **Compression unknown** - PCM assumed, but ADPCM possible
-4. **Sound class hierarchy unverified** - Reconstructed from strings
-5. **3D audio implementation unknown** - SoundSysMicrophone suggests 3D audio, but details unclear
+### The trailing byte is zero pad, never read
+
+✅ Verified. The nibble pump (`0x496193`-`0x4961bc`) reads one byte per two
+samples, so it consumes exactly `ceil(frames*channels/2)` bytes and never reads
+a trailing byte.
+
+Over all 418 compressed payloads (410 loose v2 + 8 archived v3):
+
+| payload - `ceil(frames*ch/2)` | count |
+|---|---|
+| 0 | 205 |
+| +1 | 213 |
+| anything else | 0 |
+
+The extra byte is `0x00` in 209 of the 213 cases (`0x02` once, `0x53` once,
+`0x94` twice) - a zero pad written by the encoder.
+
+## Sound Archives
+
+`.res` sound archives are ILFF containers whose `BODY` payloads are ILSF samples:
+
+| Archive | Contents |
+|---------|----------|
+| `pc/common/sounds/sounds.res` | shared effects |
+| `pc/missions/location0/level*/sounds/*.res` | per-level effects |
+| `pc/menusystem/SOUND/*.res` | menu and music |
+
+## Cutscenes
+
+The five `.avi` files are standard RIFF/AVI. `AVIFIL32.dll` + `MSVFW32.dll` handle
+playback.
+
+## Still unknown
+
+1. **ILSF `flags` (`+0x0A`)** - **Resolved**: the loader never reads it (see Loader
+   evidence above), so it is authoring metadata. It is constant `0` for loose files and
+   `0x1002` for `.res` members across all 759 payloads; only that container correlation
+   is provable.
+2. **ILSF version semantics** - **Resolved**: the version word is a bitfield
+   (`bit0 = in archive`, `bit1 = compressed`), proven by the loader's switch table
+   `0x4960d0` (v0 == v2, v1 != v3) and the ADPCM branch at `0x496a47`.
+3. **The 0-or-1 trailing byte in compressed payloads** - **Resolved**: it is zero pad,
+   never read. The nibble pump consumes exactly `ceil(frames*channels/2)`; 205/418 end
+   exactly there and 213/418 have one extra byte, `0x00` in 209 of those.
 
 ## References
 
-- DirectSound: DSOUND.dll
-- Video: AVIFIL32.dll, MSVFW32.dll
-- Audio mixing: WINMM mixer API
-- Sound scripts: sounds.qsc per level
+- Decoder: `reverse/tools/misc.py`
+- Byte-level tables: [16-verified-formats](../16-verified-formats/README.md)
